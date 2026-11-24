@@ -1,5 +1,5 @@
 // Service worker: offline + paparan notifikasi + semak peringatan di latar belakang
-const CACHE = 'ingat-v3';
+const CACHE = 'ingat-v4';
 const ASSETS = ['./', './index.html', './manifest.webmanifest', './icon-192.png', './icon-512.png', './minta.html'];
 const DATA_KEY = './__ingat_data__';
 
