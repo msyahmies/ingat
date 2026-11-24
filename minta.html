@@ -107,7 +107,9 @@
 
   // URL skrip dihantar dalam hash (#u=...) supaya tak perlu ubah kod
   const url = new URLSearchParams(location.hash.slice(1)).get('u');
-  if (!url || !/^https:\/\/script\.google(usercontent)?\.com\//.test(url)) {
+  // Google Apps Script (/exec) atau Cloudflare Worker — kedua-duanya terima POST yang sama
+  const okUrl = (u) => { try { return new URL(u).protocol === 'https:'; } catch { return false; } };
+  if (!url || !okUrl(url)) {
     $('#noLink').classList.remove('hidden'); $('#form').classList.add('hidden');
   }
   $('#from').value = store.get('minta-from') || '';

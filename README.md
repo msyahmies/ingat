@@ -45,7 +45,65 @@ Kau hantar satu link. Dia buka, tulis barang dan tekan **Hantar**. Barang terus 
 
 Borang tu ([`minta.html`](minta.html)) pun dwibahasa, dan ada butang pantas (+ Telur, + Beras, ...) supaya senang diisi.
 
-### Setup sekali sahaja (±5 minit, percuma)
+Borang perlukan satu "backend" untuk simpan senarai. Pilih **satu**:
+
+| | **A. Cloudflare Worker + KV** (disyorkan) | **B. Google Sheet + Apps Script** |
+|---|---|---|
+| Fail kod | [`worker.js`](worker.js) | [`Code.gs`](Code.gs) |
+| URL nampak macam | `https://ingat.NAMA.workers.dev` | `https://script.google.com/macros/s/.../exec` |
+| Notifikasi segera bila app ditutup | Telegram (pilihan) | Email (pilihan) |
+| Kos | Percuma (pelan Free) | Percuma |
+
+App kenal sendiri jenis URL: yang berakhir `/exec` = Google, selain tu = Cloudflare. Kau boleh tukar bila-bila masa. Cuma tampal URL lain dalam **Tetapan → Terima senarai dari orang lain**, kemudian hantar link borang yang baru kepada keluarga.
+
+<a id="setup-cloudflare"></a>
+
+### A. Setup Cloudflare Worker + KV (±10 minit, melalui dashboard)
+
+Perlu akaun Cloudflare percuma: [dash.cloudflare.com/sign-up](https://dash.cloudflare.com/sign-up).
+
+**1. Buat KV namespace (tempat simpan senarai)**
+1. Log masuk [dash.cloudflare.com](https://dash.cloudflare.com).
+2. Menu kiri: **Storage & Databases → KV** (dalam sesetengah akaun: **Workers & Pages → KV**).
+3. Tekan **Create** / **Create a namespace**, namakan `ingat-list`, kemudian **Add / Create**.
+
+**2. Buat Worker**
+1. Menu kiri: **Compute (Workers) → Workers & Pages** → **Create** → **Create Worker** (atau **Start with Hello World!**).
+2. Namakan `ingat` → **Deploy**. Ini akan deploy kod contoh dulu.
+3. Tekan **Edit code**. Padam semua kod dalam `worker.js` di editor, tampal **semua** isi fail [`worker.js`](worker.js) dari repo ni, kemudian tekan **Deploy**.
+
+**3. Sambung (bind) KV ke Worker**
+1. Buka Worker `ingat` → tab **Settings** → **Bindings** → **Add** → **KV namespace**.
+2. **Variable name:** `LIST` (mesti huruf besar, tepat begini). **KV namespace:** `ingat-list`.
+3. Tekan **Save / Deploy**.
+
+**4. Salin URL & uji**
+1. Di halaman Worker, salin URL `https://ingat.<nama-akaun>.workers.dev` (tab **Settings → Domains & Routes**, atau di bahagian atas halaman).
+2. Buka URL tu dalam browser. Sepatutnya keluar `{"result":"ok", ...}`. Kalau keluar `KV binding LIST belum diset`, ulang langkah 3.
+
+**5. Sambung ke app**
+1. Dalam app Ingat!: **Tetapan → Terima senarai dari orang lain**, tampal URL Worker → **Simpan URL**. Di bawah butang akan tertulis **Guna: Cloudflare Worker**.
+2. Tekan **💬 Hantar melalui WhatsApp** atau **📤 Kongsi link borang** untuk hantar link kepada isteri / keluarga.
+
+> Worker hanya terima permintaan dari `https://msyahmies.github.io` (CORS). Kalau app dipindah ke domain lain, tambah variable **`ALLOWED_ORIGINS`** (Settings → Variables and Secrets → Add → Text) dengan nilai origin baru, dipisah koma: `https://msyahmies.github.io,https://domain-baru.com`.
+
+<a id="setup-telegram"></a>
+
+### A2. (Pilihan) Notifikasi Telegram, sampai walaupun app ditutup
+
+1. Dalam Telegram, cari **@BotFather** → hantar `/newbot` → ikut arahan (nama bot, cth `Ingat Barang Bot`). BotFather akan bagi **token**, cth `123456789:AAH...`.
+2. Buka bot baru tu dan tekan **Start** (atau hantar apa-apa mesej, cth `hai`). Bot tak boleh hantar mesej kepada kau selagi kau belum mula chat dengan dia.
+3. Dapatkan **chat id** kau: buka `https://api.telegram.org/bot<TOKEN>/getUpdates` dalam browser (ganti `<TOKEN>`). Cari `"chat":{"id":123456789` dan salin nombor tu.
+   - Cara lain: hantar mesej kepada **@userinfobot**, dan ia balas dengan id kau.
+4. Cloudflare → Worker `ingat` → **Settings → Variables and Secrets** → **Add**:
+   - `TELEGRAM_TOKEN`: jenis **Secret**, nilai = token dari BotFather
+   - `TELEGRAM_CHAT_ID`: jenis **Text**, nilai = chat id kau
+   - Tekan **Deploy / Save**.
+5. Uji: isi borang sekali. Kau patut dapat mesej Telegram "🛒 Sayang: 2 barang nak beli…".
+
+> Token bot macam kata laluan. Simpan sebagai **Secret** sahaja. Jangan tampal dalam kod atau kongsi.
+
+### B. Setup Google Sheet + Apps Script (cara lama, masih disokong)
 
 1. Buka [sheets.new](https://sheets.new) untuk cipta Google Sheet baru. Namakan, cth: `Ingat - Barang`.
 2. Menu **Extensions → Apps Script**. Padam kod asal, tampal **semua** isi fail [`Code.gs`](Code.gs), kemudian **Save** 💾.
@@ -60,13 +118,26 @@ Borang tu ([`minta.html`](minta.html)) pun dwibahasa, dan ada butang pantas (+ T
 
 ### Bila barang masuk?
 - Bila app Ingat! dibuka, dan setiap 1 minit selagi app terbuka.
-- Bila app ditutup, barang tetap selamat dalam Google Sheet dan akan masuk bila kau buka app. Untuk tahu serta-merta, isi `NOTIFY_EMAIL` (langkah 3).
-- Barang yang dah masuk ditanda `diambil` dalam Sheet, jadi tak akan masuk dua kali.
+- Bila app ditutup, barang tetap selamat dalam KV / Google Sheet dan akan masuk bila kau buka app. Untuk tahu serta-merta, set Telegram (A2) atau `NOTIFY_EMAIL` (B, langkah 3).
+- Tiada barang masuk dua kali:
+  - **Cloudflare:** app ingat ID barang terakhir dan hanya minta yang lebih baru (`?since=`). Barang dalam KV dibuang automatik selepas 30 hari.
+  - **Google:** barang yang dah masuk ditanda `diambil` dalam Sheet.
+- Tukar URL? Link borang lama yang isteri simpan masih hantar ke backend lama. Hantar link baru kepadanya.
 
 > Siapa-siapa yang ada link tu boleh tambah barang. Jangan kongsi di tempat awam.
 
 ### English
-Set up a Google Sheet + Apps Script as above (paste [`Code.gs`](Code.gs), run `setup`, deploy as Web app with access *Anyone*). Paste the `/exec` URL in **Settings → Receive lists from others**, then share the form link. Items your family submits appear in your **To Buy** list (with their name), with a notification. Set `NOTIFY_EMAIL` to also get an email instantly.
+Pick one backend for the family form:
+- **A. Cloudflare Worker + KV (recommended):** create a KV namespace, create a Worker, paste [`worker.js`](worker.js), add a KV binding named **`LIST`**, then copy the `*.workers.dev` URL. Optional Telegram alerts: set `TELEGRAM_TOKEN` (Secret) and `TELEGRAM_CHAT_ID` (Text) in the Worker's *Variables and Secrets*.
+- **B. Google Sheet + Apps Script:** paste [`Code.gs`](Code.gs), run `setup`, deploy as a Web app with access *Anyone*, then copy the `/exec` URL.
+
+Paste the URL in **Settings → Receive lists from others** (the app detects the type: `/exec` = Google, anything else = Cloudflare), then share the form link. Items appear in **To Buy** with the sender's name, plus a notification.
+
+### Ujian / Tests
+```bash
+npm test
+```
+Ujian `worker.js` dengan KV & Telegram palsu ([`tests/worker.test.mjs`](tests/worker.test.mjs)). Tiada pakej perlu dipasang (Node 18+).
 
 ## Fail
 
@@ -77,7 +148,9 @@ Set up a Google Sheet + Apps Script as above (paste [`Code.gs`](Code.gs), run `s
 | `manifest.webmanifest` | Supaya boleh dipasang ke skrin utama |
 | `icon-192.png`, `icon-512.png` | Ikon app |
 | `minta.html` | Borang untuk orang lain isi senarai barang |
-| `Code.gs` | Google Apps Script: simpan senarai ke Google Sheet & bagi app tarik |
+| `worker.js` | Cloudflare Worker: simpan senarai dalam KV & bagi app tarik (backend A) |
+| `Code.gs` | Google Apps Script: simpan senarai ke Google Sheet & bagi app tarik (backend B) |
+| `tests/worker.test.mjs`, `package.json` | Ujian untuk `worker.js` (`npm test`) |
 
 ---
 

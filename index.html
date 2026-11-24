@@ -120,8 +120,8 @@
     <h2 data-t="inboxH">Terima senarai dari orang lain</h2>
     <div class="card">
       <p style="margin-top:0" data-t="inboxP">Hantar satu link kepada isteri / keluarga. Bila mereka isi, barang terus masuk ke senarai "Nak Beli" kau.</p>
-      <label for="inboxUrl" data-t="inboxUrlL">URL Google Apps Script (/exec)</label>
-      <input id="inboxUrl" inputmode="url" placeholder="https://script.google.com/macros/s/.../exec">
+      <label for="inboxUrl" data-t="inboxUrlL">URL Cloudflare Worker / Google Apps Script</label>
+      <input id="inboxUrl" inputmode="url" placeholder="https://ingat.NAMA.workers.dev">
       <p data-t="inboxHelp">Belum ada? Ikut <a href="https://github.com/msyahmies/ingat#setup-borang" target="_blank" rel="noopener">langkah setup</a> (5 minit, percuma).</p>
       <div class="actions"><button class="btn ghost" id="inboxSave" data-t="inboxSave">Simpan URL</button><button class="btn ghost" id="inboxSync" data-t="inboxSync">🔄 Semak sekarang</button></div>
       <div id="shareBox" class="hidden">
@@ -229,10 +229,10 @@
       dataP: 'Semua data disimpan dalam fon ni sahaja.', backup: 'Simpan backup', restore: 'Pulihkan',
       clearDone: 'Buang semua yang dah selesai / dah beli',
       inboxH: 'Terima senarai dari orang lain', inboxP: 'Hantar satu link kepada isteri / keluarga. Bila mereka isi, barang terus masuk ke senarai "Nak Beli" kau.',
-      inboxUrlL: 'URL Google Apps Script (/exec)', inboxHelp: 'Belum ada? Ikut <a href="https://github.com/msyahmies/ingat#setup-borang" target="_blank" rel="noopener">langkah setup</a> (5 minit, percuma).',
+      inboxUrlL: 'URL Cloudflare Worker / Google Apps Script', backendIs: (k) => `Guna: ${k}`, inboxHelp: 'Belum ada? Ikut <a href="https://github.com/msyahmies/ingat#setup-borang" target="_blank" rel="noopener">langkah setup</a> (5 minit, percuma).',
       inboxSave: 'Simpan URL', inboxSync: '🔄 Semak sekarang', shareBtn: '📤 Kongsi link borang', waBtn: '💬 Hantar melalui WhatsApp',
       shareMsg: 'Tolong tulis barang dapur yang nak dibeli kat sini, nanti terus masuk dalam senarai aku 🙏',
-      badUrl: 'URL tak sah. Mesti bermula https://script.google.com/', urlSaved: 'URL disimpan', linkCopied: 'Link disalin — tampal dalam WhatsApp',
+      badUrl: 'URL tak sah. Mesti bermula https:// (Cloudflare Worker atau Google /exec)', urlSaved: 'URL disimpan', linkCopied: 'Link disalin — tampal dalam WhatsApp',
       syncOk: (n) => n ? `${n} barang baru masuk` : 'Tiada barang baru', syncFail: 'Gagal semak. Semak internet / URL.',
       lastSync: (d) => `Semakan terakhir: ${d}`, fromWho: (n) => `dari ${n}`,
       newItemsN: (who, n) => `🛒 ${who} tambah ${n} barang`, someone: 'Seseorang',
@@ -278,10 +278,10 @@
       dataP: 'All data is stored on this phone only.', backup: 'Save backup', restore: 'Restore',
       clearDone: 'Remove all completed tasks / bought items',
       inboxH: 'Receive lists from others', inboxP: 'Send one link to your spouse / family. When they fill it in, the items go straight into your "To Buy" list.',
-      inboxUrlL: 'Google Apps Script URL (/exec)', inboxHelp: 'Don\'t have one? Follow the <a href="https://github.com/msyahmies/ingat#setup-borang" target="_blank" rel="noopener">setup steps</a> (5 minutes, free).',
+      inboxUrlL: 'Cloudflare Worker / Google Apps Script URL', backendIs: (k) => `Using: ${k}`, inboxHelp: 'Don\'t have one? Follow the <a href="https://github.com/msyahmies/ingat#setup-borang" target="_blank" rel="noopener">setup steps</a> (5 minutes, free).',
       inboxSave: 'Save URL', inboxSync: '🔄 Check now', shareBtn: '📤 Share form link', waBtn: '💬 Send via WhatsApp',
       shareMsg: 'Please write the groceries to buy here, it goes straight into my list 🙏',
-      badUrl: 'Invalid URL. It must start with https://script.google.com/', urlSaved: 'URL saved', linkCopied: 'Link copied — paste it in WhatsApp',
+      badUrl: 'Invalid URL. It must start with https:// (Cloudflare Worker or Google /exec)', urlSaved: 'URL saved', linkCopied: 'Link copied — paste it in WhatsApp',
       syncOk: (n) => n ? `${n} new item(s) added` : 'No new items', syncFail: 'Check failed. Check internet / URL.',
       lastSync: (d) => `Last checked: ${d}`, fromWho: (n) => `from ${n}`,
       newItemsN: (who, n) => `🛒 ${who} added ${n} item(s)`, someone: 'Someone',
@@ -684,8 +684,13 @@
   setInterval(check, 15000);
   document.addEventListener('visibilitychange', () => { if (!document.hidden) { check(); syncInbox(); } });
 
-  // ---------- Peti masuk dari borang (Google Apps Script) ----------
-  const validUrl = (u) => /^https:\/\/script\.google(usercontent)?\.com\/\S+$/.test(u);
+  // ---------- Peti masuk dari borang ----------
+  // Dua jenis backend / two backends:
+  //   Google Apps Script (URL berakhir /exec)  → tarik semua "baru", kemudian ack
+  //   Cloudflare Worker (URL lain)             → tarik dengan ?since=<ID terakhir>
+  const isGoogle = (u) => /^https:\/\/script\.google(usercontent)?\.com\//.test(u) || /\/exec(\?|$)/.test(u);
+  const validUrl = (u) => { try { const x = new URL(u); return x.protocol === 'https:' && !!x.hostname; } catch { return false; } };
+  const withParams = (u, q) => u + (u.includes('?') ? '&' : '?') + q;
   const formLink = () => new URL('minta.html', location.href).href.split('?')[0] + '#u=' + encodeURIComponent(S.settings.inboxUrl);
   let syncing = false, lastSyncAt = 0;
   async function syncInbox(manual) {
@@ -693,7 +698,9 @@
     if (!url || syncing || !navigator.onLine) return;
     syncing = true;
     try {
-      const res = await fetch(url + (url.includes('?') ? '&' : '?') + 'action=list');
+      const google = isGoogle(url);
+      const since = !google && S.settings.inboxSinceFor === url ? S.settings.inboxSince || '' : '';
+      const res = await fetch(withParams(url, 'action=list' + (since ? '&since=' + encodeURIComponent(since) : '')), { cache: 'no-store' });
       const j = await res.json();
       if (j.result !== 'success') throw new Error(j.message);
       const seen = new Set(S.inboxSeen || []);
@@ -703,6 +710,7 @@
         seen.add(x.id);
       });
       S.inboxSeen = [...seen].slice(-1000);
+      if (!google && j.next && j.next !== S.settings.inboxSince) { S.settings.inboxSince = j.next; S.settings.inboxSinceFor = url; save(); }
       lastSyncAt = Date.now();
       if (fresh.length) {
         save();
@@ -710,7 +718,7 @@
         notify(tr('newItemsN')(who, fresh.length), fresh.slice(0, 8).map((x) => x.item).join(', '), { tag: 'inbox', requireInteraction: true });
       }
       const all = (j.items || []).map((x) => x.id).filter(Boolean);
-      if (all.length) fetch(url + (url.includes('?') ? '&' : '?') + 'action=ack&ids=' + encodeURIComponent(all.join(','))).catch(() => {});
+      if (google && all.length) fetch(withParams(url, 'action=ack&ids=' + encodeURIComponent(all.join(',')))).catch(() => {});
       if (manual) toast(tr('syncOk')(fresh.length));
     } catch (e) {
       if (manual) toast(tr('syncFail'));
@@ -719,11 +727,13 @@
   function renderInbox() {
     $('#inboxUrl').value = S.settings.inboxUrl || '';
     $('#shareBox').classList.toggle('hidden', !S.settings.inboxUrl);
-    $('#inboxStatus').textContent = lastSyncAt ? tr('lastSync')(fmtTime(new Date(lastSyncAt))) : '';
+    const kind = S.settings.inboxUrl ? (isGoogle(S.settings.inboxUrl) ? 'Google Sheet' : 'Cloudflare Worker') : '';
+    $('#inboxStatus').textContent = [kind && tr('backendIs')(kind), lastSyncAt ? tr('lastSync')(fmtTime(new Date(lastSyncAt))) : ''].filter(Boolean).join(' · ');
   }
   $('#inboxSave').addEventListener('click', () => {
     const u = $('#inboxUrl').value.trim();
     if (u && !validUrl(u)) return toast(tr('badUrl'));
+    if (u !== S.settings.inboxUrl) { S.settings.inboxSince = ''; S.settings.inboxSinceFor = ''; }
     S.settings.inboxUrl = u; save(); renderInbox();
     if (u) { toast(tr('urlSaved')); syncInbox(true); }
   });
