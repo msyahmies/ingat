@@ -1,0 +1,750 @@
+<!doctype html>
+<html lang="ms">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Ingat!</title>
+<meta name="theme-color" content="#0f766e">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Ingat!">
+<style>
+  :root{
+    --bg:#f5f5f4; --card:#fff; --ink:#1c1917; --mute:#78716c; --line:#e7e5e4;
+    --brand:#0f766e; --brand-ink:#fff; --soft:#ccfbf1; --red:#dc2626; --red-soft:#fee2e2;
+    --amber:#b45309; --amber-soft:#fef3c7;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --bg:#0c0a09; --card:#1c1917; --ink:#f5f5f4; --mute:#a8a29e; --line:#292524;
+      --brand:#14b8a6; --brand-ink:#042f2e; --soft:#134e4a; --red:#f87171; --red-soft:#450a0a;
+      --amber:#fbbf24; --amber-soft:#451a03;
+    }
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.4 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+  body{padding-bottom:calc(90px + env(safe-area-inset-bottom))}
+  header{position:sticky;top:0;z-index:5;background:var(--brand);color:var(--brand-ink);padding:calc(14px + env(safe-area-inset-top)) 16px 0}
+  header h1{margin:0;font-size:22px;letter-spacing:.2px}
+  .top{display:flex;align-items:center;justify-content:space-between;gap:12px}
+  .lang{font:700 14px system-ui;color:inherit;background:rgba(255,255,255,.18);border:1px solid rgba(255,255,255,.45);border-radius:20px;padding:6px 12px}
+  header .sub{opacity:.85;font-size:13px;margin-top:2px}
+  nav{display:flex;margin-top:12px}
+  nav button{flex:1;background:none;border:0;color:inherit;opacity:.7;font:600 15px system-ui;padding:10px 4px 12px;border-bottom:3px solid transparent}
+  nav button.on{opacity:1;border-color:currentColor}
+  nav .count{display:inline-block;min-width:20px;padding:0 6px;margin-left:4px;border-radius:10px;background:rgba(255,255,255,.25);font-size:12px}
+  main{max-width:640px;margin:0 auto;padding:12px 16px}
+  .banner{background:var(--amber-soft);color:var(--amber);border-radius:12px;padding:12px 14px;margin-bottom:12px;font-size:14px}
+  .banner button{margin-top:8px}
+  h2{font-size:13px;text-transform:uppercase;letter-spacing:.6px;color:var(--mute);margin:18px 4px 8px}
+  h2.late{color:var(--red)}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:14px;overflow:hidden}
+  .row{display:flex;align-items:center;gap:12px;padding:12px 14px;border-top:1px solid var(--line)}
+  .row:first-child{border-top:0}
+  .row.late{background:var(--red-soft)}
+  .chk{flex:none;width:28px;height:28px;border-radius:50%;border:2px solid var(--mute);background:none;display:grid;place-items:center;color:var(--brand-ink);font-size:15px;padding:0}
+  .chk.on{background:var(--brand);border-color:var(--brand)}
+  .txt{flex:1;min-width:0}
+  .ttl{font-weight:600;word-wrap:break-word}
+  .done .ttl{text-decoration:line-through;color:var(--mute);font-weight:400}
+  .meta{font-size:13px;color:var(--mute);margin-top:2px}
+  .late .meta{color:var(--red);font-weight:600}
+  .icon{flex:none;background:none;border:0;color:var(--mute);font-size:18px;padding:6px;border-radius:8px}
+  .empty{text-align:center;color:var(--mute);padding:40px 16px}
+  .empty b{display:block;font-size:40px;margin-bottom:6px}
+  .quick{display:flex;gap:8px}
+  .quick input{flex:1}
+  input,select,textarea{width:100%;font:inherit;color:var(--ink);background:var(--card);border:1px solid var(--line);border-radius:10px;padding:11px 12px}
+  textarea{min-height:60px;resize:vertical}
+  label{display:block;font-size:13px;color:var(--mute);margin:12px 0 5px}
+  .btn{font:600 15px system-ui;border:0;border-radius:10px;padding:11px 16px;background:var(--brand);color:var(--brand-ink)}
+  .btn.ghost{background:var(--soft);color:var(--ink)}
+  .btn.red{background:var(--red-soft);color:var(--red)}
+  .btn.full{width:100%}
+  .chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+  .chip{font:500 13px system-ui;border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:20px;padding:6px 11px}
+  .fab{position:fixed;right:20px;bottom:calc(20px + env(safe-area-inset-bottom));width:60px;height:60px;border-radius:50%;border:0;background:var(--brand);color:var(--brand-ink);font-size:32px;box-shadow:0 6px 20px rgba(0,0,0,.25)}
+  .sheet-bg{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:20;display:none}
+  .sheet{position:fixed;left:0;right:0;bottom:0;z-index:21;background:var(--bg);border-radius:18px 18px 0 0;padding:18px 16px calc(18px + env(safe-area-inset-bottom));max-height:92vh;overflow:auto;transform:translateY(105%);transition:transform .2s}
+  .sheet.open{transform:none}
+  .sheet-bg.open{display:block}
+  .sheet h3{margin:0 0 4px;font-size:18px}
+  .actions{display:flex;gap:8px;margin-top:16px}
+  .actions .btn{flex:1}
+  .toast{position:fixed;left:50%;bottom:96px;transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:10px;font-size:14px;z-index:30;opacity:0;transition:opacity .2s;pointer-events:none;max-width:90vw;text-align:center}
+  .toast.show{opacity:1}
+  .set p{font-size:14px;color:var(--mute);margin:6px 0 0}
+  .set p a{color:var(--brand);font-weight:600}
+  .set .card{padding:14px}
+  .set .card+.card{margin-top:12px}
+  .hidden{display:none!important}
+</style>
+</head>
+<body>
+<header>
+  <div class="top"><h1>Ingat! 🔔</h1><button type="button" class="lang" id="langBtn" aria-label="Language / Bahasa">EN</button></div>
+  <div class="sub" id="today"></div>
+  <nav>
+    <button data-tab="tasks" class="on"><span data-t="tabTasks">Tugasan</span> <span class="count" id="cTasks">0</span></button>
+    <button data-tab="shop"><span data-t="tabShop">Nak Beli</span> <span class="count" id="cShop">0</span></button>
+    <button data-tab="set" data-t="tabSet">Tetapan</button>
+  </nav>
+</header>
+
+<main>
+  <div class="banner hidden" id="permBanner">
+    <span data-t="permText"><b>Notifikasi belum dibenarkan.</b> Tanpa ni, app tak boleh ingatkan kau.</span>
+    <div><button class="btn" id="permBtn" data-t="permBtn">Benarkan notifikasi</button></div>
+  </div>
+
+  <!-- TUGASAN -->
+  <section id="tab-tasks"></section>
+
+  <!-- BARANG -->
+  <section id="tab-shop" class="hidden">
+    <form class="quick" id="shopForm" autocomplete="off">
+      <input id="shopInput" data-tp="shopPh" placeholder="Tambah barang, cth: telur 2 papan" enterkeyhint="done">
+      <button class="btn" data-t="add">Tambah</button>
+    </form>
+    <div id="shopList"></div>
+  </section>
+
+  <!-- TETAPAN -->
+  <section id="tab-set" class="hidden set">
+    <h2 data-t="autoH">Peringatan automatik</h2>
+    <div class="card">
+      <label for="morningTime" style="margin-top:0" data-t="morningL">🌅 Ringkasan pagi (senarai kerja hari ni)</label>
+      <input type="time" id="morningTime">
+      <label for="shopTime" data-t="shopL">🛒 Ingatkan barang yang belum dibeli</label>
+      <input type="time" id="shopTime">
+      <p data-t="clearHint">Kosongkan masa untuk matikan.</p>
+    </div>
+
+    <h2 data-t="inboxH">Terima senarai dari orang lain</h2>
+    <div class="card">
+      <p style="margin-top:0" data-t="inboxP">Hantar satu link kepada isteri / keluarga. Bila mereka isi, barang terus masuk ke senarai "Nak Beli" kau.</p>
+      <label for="inboxUrl" data-t="inboxUrlL">URL Google Apps Script (/exec)</label>
+      <input id="inboxUrl" inputmode="url" placeholder="https://script.google.com/macros/s/.../exec">
+      <p data-t="inboxHelp">Belum ada? Ikut <a href="https://github.com/msyahmies/ingat#setup-borang" target="_blank" rel="noopener">langkah setup</a> (5 minit, percuma).</p>
+      <div class="actions"><button class="btn ghost" id="inboxSave" data-t="inboxSave">Simpan URL</button><button class="btn ghost" id="inboxSync" data-t="inboxSync">🔄 Semak sekarang</button></div>
+      <div id="shareBox" class="hidden">
+        <div class="actions"><button class="btn" id="shareBtn" data-t="shareBtn">📤 Kongsi link borang</button></div>
+        <div class="actions"><button class="btn ghost" id="waBtn" data-t="waBtn">💬 Hantar melalui WhatsApp</button></div>
+        <p id="inboxStatus"></p>
+      </div>
+    </div>
+
+    <h2 data-t="reliableH">Supaya notifikasi sampai walaupun app ditutup</h2>
+    <div class="card">
+      <p style="margin-top:0" data-t="reliableP">Fon biasanya "tidurkan" app web bila ditutup. Cara <b>paling pasti</b>: masukkan peringatan ke <b>Kalendar fon</b> — kalendar akan bunyi walaupun app ni tak dibuka.</p>
+      <div class="actions"><button class="btn" id="icsAll" data-t="icsAll">📅 Eksport semua ke Kalendar</button></div>
+      <p data-t="icsEach">Setiap tugasan juga ada butang 📅 sendiri.</p>
+    </div>
+
+    <div class="card" id="installCard">
+      <b data-t="installH">📲 Pasang di skrin utama</b>
+      <p id="installHelp" data-t="installP">Android (Chrome): menu ⋮ → <b>Add to Home screen / Install app</b>.<br>iPhone (Safari): butang Share → <b>Add to Home Screen</b> (wajib untuk notifikasi di iPhone).</p>
+      <div class="actions hidden" id="installRow"><button class="btn" id="installBtn" data-t="installBtn">Pasang sekarang</button></div>
+    </div>
+
+    <div class="card">
+      <b data-t="testH">Uji notifikasi</b>
+      <p data-t="testP">Tekan dan tunggu 5 saat.</p>
+      <div class="actions"><button class="btn ghost" id="testBtn" data-t="testBtn">🔔 Hantar notifikasi ujian</button></div>
+    </div>
+
+    <h2>Data</h2>
+    <div class="card">
+      <p style="margin-top:0" data-t="dataP">Semua data disimpan dalam fon ni sahaja.</p>
+      <div class="actions">
+        <button class="btn ghost" id="backupBtn" data-t="backup">Simpan backup</button>
+        <button class="btn ghost" id="restoreBtn" data-t="restore">Pulihkan</button>
+      </div>
+      <input type="file" id="restoreFile" accept="application/json" class="hidden">
+      <div class="actions"><button class="btn red" id="clearDone" data-t="clearDone">Buang semua yang dah selesai / dah beli</button></div>
+    </div>
+  </section>
+</main>
+
+<button class="fab" id="fab" aria-label="Tambah tugasan">+</button>
+
+<div class="sheet-bg" id="sheetBg"></div>
+<form class="sheet" id="sheet" autocomplete="off">
+  <h3 id="sheetTitle">Tugasan baru</h3>
+  <label for="fTitle" data-t="fTitleL">Apa yang perlu dibuat?</label>
+  <input id="fTitle" required data-tp="fTitlePh" placeholder="cth: Bayar bil TNB">
+  <label for="fDue" data-t="fDueL">Ingatkan aku pada</label>
+  <input type="datetime-local" id="fDue">
+  <div class="chips" id="presets">
+    <button type="button" class="chip" data-p="30m">+30 min</button>
+    <button type="button" class="chip" data-p="1h" data-t="p1h">+1 jam</button>
+    <button type="button" class="chip" data-p="eve" data-t="pEve">Petang ni 5:00</button>
+    <button type="button" class="chip" data-p="night" data-t="pNight">Malam ni 9:00</button>
+    <button type="button" class="chip" data-p="tmr" data-t="pTmr">Esok 9:00 pagi</button>
+    <button type="button" class="chip" data-p="none" data-t="pNone">Tiada masa</button>
+  </div>
+  <label for="fRepeat" data-t="fRepeatL">Ulang</label>
+  <select id="fRepeat">
+    <option value="none" data-t="rNone">Sekali sahaja</option>
+    <option value="daily" data-t="rDaily">Setiap hari</option>
+    <option value="weekly" data-t="rWeekly">Setiap minggu</option>
+    <option value="monthly" data-t="rMonthly">Setiap bulan</option>
+  </select>
+  <label for="fNote" data-t="fNoteL">Nota (pilihan)</label>
+  <textarea id="fNote" data-tp="fNotePh" placeholder="cth: no akaun 2200..."></textarea>
+  <div class="actions">
+    <button type="button" class="btn red hidden" id="fDelete" data-t="del">Padam</button>
+    <button type="button" class="btn ghost" id="fCancel" data-t="cancel">Batal</button>
+    <button class="btn" data-t="save">Simpan</button>
+  </div>
+</form>
+
+<div class="toast" id="toast"></div>
+
+<script>
+(() => {
+  'use strict';
+  const $ = (s) => document.querySelector(s);
+  const KEY = 'ingat-v1';
+  const DAY = 864e5;
+
+  // ---------- State ----------
+  const defaults = () => ({ tasks: [], shop: [], settings: { morningTime: '08:00', shopTime: '17:30', lastMorning: '', lastShop: '', inboxUrl: '' }, inboxSeen: [] });
+  let S;
+  try { S = Object.assign(defaults(), JSON.parse(localStorage.getItem(KEY) || '{}')); } catch { S = defaults(); }
+  S.settings = Object.assign(defaults().settings, S.settings);
+  if (!S.settings.lang) S.settings.lang = /^(ms|id)/i.test(navigator.language || '') ? 'ms' : 'en';
+
+  // ---------- Bahasa / Language ----------
+  const L = {
+    ms: {
+      tabTasks: 'Tugasan', tabShop: 'Nak Beli', tabSet: 'Tetapan',
+      permText: '<b>Notifikasi belum dibenarkan.</b> Tanpa ni, app tak boleh ingatkan kau.', permBtn: 'Benarkan notifikasi',
+      shopPh: 'Tambah barang, cth: telur, gula, roti', add: 'Tambah',
+      autoH: 'Peringatan automatik', morningL: '🌅 Ringkasan pagi (senarai kerja hari ni)', shopL: '🛒 Ingatkan barang yang belum dibeli',
+      clearHint: 'Kosongkan masa untuk matikan.',
+      reliableH: 'Supaya notifikasi sampai walaupun app ditutup',
+      reliableP: 'Fon biasanya "tidurkan" app web bila ditutup. Cara <b>paling pasti</b>: masukkan peringatan ke <b>Kalendar fon</b> — kalendar akan bunyi walaupun app ni tak dibuka.',
+      icsAll: '📅 Eksport semua ke Kalendar', icsEach: 'Setiap tugasan juga ada butang 📅 sendiri.',
+      installH: '📲 Pasang di skrin utama',
+      installP: 'Android (Chrome): menu ⋮ → <b>Add to Home screen / Install app</b>.<br>iPhone (Safari): butang Share → <b>Add to Home Screen</b> (wajib untuk notifikasi di iPhone).',
+      installBtn: 'Pasang sekarang', testH: 'Uji notifikasi', testP: 'Tekan dan tunggu 5 saat.', testBtn: '🔔 Hantar notifikasi ujian',
+      dataP: 'Semua data disimpan dalam fon ni sahaja.', backup: 'Simpan backup', restore: 'Pulihkan',
+      clearDone: 'Buang semua yang dah selesai / dah beli',
+      inboxH: 'Terima senarai dari orang lain', inboxP: 'Hantar satu link kepada isteri / keluarga. Bila mereka isi, barang terus masuk ke senarai "Nak Beli" kau.',
+      inboxUrlL: 'URL Google Apps Script (/exec)', inboxHelp: 'Belum ada? Ikut <a href="https://github.com/msyahmies/ingat#setup-borang" target="_blank" rel="noopener">langkah setup</a> (5 minit, percuma).',
+      inboxSave: 'Simpan URL', inboxSync: '🔄 Semak sekarang', shareBtn: '📤 Kongsi link borang', waBtn: '💬 Hantar melalui WhatsApp',
+      shareMsg: 'Tolong tulis barang dapur yang nak dibeli kat sini, nanti terus masuk dalam senarai aku 🙏',
+      badUrl: 'URL tak sah. Mesti bermula https://script.google.com/', urlSaved: 'URL disimpan', linkCopied: 'Link disalin — tampal dalam WhatsApp',
+      syncOk: (n) => n ? `${n} barang baru masuk` : 'Tiada barang baru', syncFail: 'Gagal semak. Semak internet / URL.',
+      lastSync: (d) => `Semakan terakhir: ${d}`, fromWho: (n) => `dari ${n}`,
+      newItemsN: (who, n) => `🛒 ${who} tambah ${n} barang`, someone: 'Seseorang',
+      fTitleL: 'Apa yang perlu dibuat?', fTitlePh: 'cth: Bayar bil TNB', fDueL: 'Ingatkan aku pada',
+      p1h: '+1 jam', pEve: 'Petang ni 5:00', pNight: 'Malam ni 9:00', pTmr: 'Esok 9:00 pagi', pNone: 'Tiada masa',
+      fRepeatL: 'Ulang', rNone: 'Sekali sahaja', rDaily: 'Setiap hari', rWeekly: 'Setiap minggu', rMonthly: 'Setiap bulan',
+      fNoteL: 'Nota (pilihan)', fNotePh: 'cth: no akaun 2200...', del: 'Padam', cancel: 'Batal', save: 'Simpan',
+      days: ['Ahad', 'Isnin', 'Selasa', 'Rabu', 'Khamis', 'Jumaat', 'Sabtu'],
+      months: ['Jan', 'Feb', 'Mac', 'Apr', 'Mei', 'Jun', 'Jul', 'Ogo', 'Sep', 'Okt', 'Nov', 'Dis'],
+      ampm: (h) => h < 12 ? 'pagi' : h < 14 ? 'tengah hari' : h < 19 ? 'petang' : 'malam',
+      today: 'Hari ini', tomorrow: 'Esok', yesterday: 'Semalam',
+      minAgo: (n) => `${n} min lepas`, hrAgo: (n) => `${n} jam lepas`, dayAgo: (n) => `${n} hari lepas`,
+      rep: { daily: 'setiap hari', weekly: 'setiap minggu', monthly: 'setiap bulan' },
+      missed: 'Terlepas', nMissed: (n) => `${n} terlepas!`,
+      gLate: '⚠️ Terlepas', gToday: 'Hari ini', gLater: 'Akan datang', gAny: 'Bila-bila', gDone: 'Selesai',
+      emptyTasks: 'Tiada apa nak diingat lagi.<br>Tekan <b>+</b> untuk tambah tugasan.',
+      toBuy: 'Belum beli', bought: 'Dah beli', emptyShop: 'Senarai kosong.<br>Terus taip barang bila teringat — nanti app ingatkan.',
+      markDone: 'Tanda selesai', markBought: 'Tanda dah beli', toCal: 'Tambah ke kalendar', remove: 'Padam',
+      editTask: 'Ubah tugasan', newTask: 'Tugasan baru',
+      saved: 'Disimpan', savedPast: 'Disimpan — masa tu dah lepas!', willRemind: (d) => `Okay! Aku ingatkan ${d}`,
+      deleted: 'Dipadam', good: 'Bagus! ✅', nextAt: (d) => `Bagus! Seterusnya: ${d}`, snoozed: (n) => `Ditunda ${n} minit`,
+      confirmClear: 'Buang semua tugasan selesai & barang yang dah dibeli?', cleaned: 'Dibersihkan',
+      restored: 'Data dipulihkan', badBackup: 'Fail backup tak sah',
+      noTimed: 'Tiada tugasan bermasa untuk dieksport', openIcs: 'Buka fail .ics tu untuk masukkan ke Kalendar',
+      calShop: '🛒 Semak app Ingat! — barang nak beli', calMorning: '🌅 Semak app Ingat! — kerja hari ni',
+      blocked: 'Notifikasi telah disekat. Buka tetapan pelayar/app → Site settings → Notifications → benarkan untuk laman ini.',
+      timeToDo: 'Masa untuk buat ni! Jangan tangguh 😉', aDone: '✅ Selesai', aSnooze: '⏳ Tunda 10 min',
+      morningN: (n) => `🌅 ${n} perkara untuk hari ni`, shopN: (n) => `🛒 Jangan lupa beli (${n})`,
+      wait5: 'Tunggu 5 saat…', allowFirst: 'Benarkan notifikasi dulu', testOk: '🔔 Ujian berjaya!', testBody: 'Notifikasi app Ingat! berfungsi.'
+    },
+    en: {
+      tabTasks: 'Tasks', tabShop: 'To Buy', tabSet: 'Settings',
+      permText: "<b>Notifications are off.</b> Without them, the app can't remind you.", permBtn: 'Allow notifications',
+      shopPh: 'Add items, e.g. eggs, sugar, bread', add: 'Add',
+      autoH: 'Automatic reminders', morningL: "🌅 Morning summary (today's tasks)", shopL: "🛒 Remind me of items I haven't bought",
+      clearHint: 'Clear the time to turn it off.',
+      reliableH: 'Get reminders even when the app is closed',
+      reliableP: "Phones usually put web apps to sleep when closed. The <b>most reliable</b> way: add reminders to your <b>phone's Calendar</b> — it will ring even if this app isn't open.",
+      icsAll: '📅 Export all to Calendar', icsEach: 'Each task also has its own 📅 button.',
+      installH: '📲 Install on home screen',
+      installP: 'Android (Chrome): menu ⋮ → <b>Add to Home screen / Install app</b>.<br>iPhone (Safari): Share button → <b>Add to Home Screen</b> (required for notifications on iPhone).',
+      installBtn: 'Install now', testH: 'Test notification', testP: 'Tap and wait 5 seconds.', testBtn: '🔔 Send test notification',
+      dataP: 'All data is stored on this phone only.', backup: 'Save backup', restore: 'Restore',
+      clearDone: 'Remove all completed tasks / bought items',
+      inboxH: 'Receive lists from others', inboxP: 'Send one link to your spouse / family. When they fill it in, the items go straight into your "To Buy" list.',
+      inboxUrlL: 'Google Apps Script URL (/exec)', inboxHelp: 'Don\'t have one? Follow the <a href="https://github.com/msyahmies/ingat#setup-borang" target="_blank" rel="noopener">setup steps</a> (5 minutes, free).',
+      inboxSave: 'Save URL', inboxSync: '🔄 Check now', shareBtn: '📤 Share form link', waBtn: '💬 Send via WhatsApp',
+      shareMsg: 'Please write the groceries to buy here, it goes straight into my list 🙏',
+      badUrl: 'Invalid URL. It must start with https://script.google.com/', urlSaved: 'URL saved', linkCopied: 'Link copied — paste it in WhatsApp',
+      syncOk: (n) => n ? `${n} new item(s) added` : 'No new items', syncFail: 'Check failed. Check internet / URL.',
+      lastSync: (d) => `Last checked: ${d}`, fromWho: (n) => `from ${n}`,
+      newItemsN: (who, n) => `🛒 ${who} added ${n} item(s)`, someone: 'Someone',
+      fTitleL: 'What do you need to do?', fTitlePh: 'e.g. Pay electricity bill', fDueL: 'Remind me at',
+      p1h: '+1 hour', pEve: 'This evening 5:00', pNight: 'Tonight 9:00', pTmr: 'Tomorrow 9:00 AM', pNone: 'No time',
+      fRepeatL: 'Repeat', rNone: 'Once only', rDaily: 'Every day', rWeekly: 'Every week', rMonthly: 'Every month',
+      fNoteL: 'Note (optional)', fNotePh: 'e.g. account no 2200...', del: 'Delete', cancel: 'Cancel', save: 'Save',
+      days: ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'],
+      months: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
+      ampm: (h) => h < 12 ? 'AM' : 'PM',
+      today: 'Today', tomorrow: 'Tomorrow', yesterday: 'Yesterday',
+      minAgo: (n) => `${n} min ago`, hrAgo: (n) => `${n} hr ago`, dayAgo: (n) => `${n} days ago`,
+      rep: { daily: 'every day', weekly: 'every week', monthly: 'every month' },
+      missed: 'Missed', nMissed: (n) => `${n} missed!`,
+      gLate: '⚠️ Missed', gToday: 'Today', gLater: 'Upcoming', gAny: 'Anytime', gDone: 'Done',
+      emptyTasks: 'Nothing to remember yet.<br>Tap <b>+</b> to add a task.',
+      toBuy: 'To buy', bought: 'Bought', emptyShop: "List is empty.<br>Type items as soon as you think of them — the app will remind you.",
+      markDone: 'Mark as done', markBought: 'Mark as bought', toCal: 'Add to calendar', remove: 'Delete',
+      editTask: 'Edit task', newTask: 'New task',
+      saved: 'Saved', savedPast: 'Saved — that time has already passed!', willRemind: (d) => `Okay! I'll remind you ${d}`,
+      deleted: 'Deleted', good: 'Nice! ✅', nextAt: (d) => `Nice! Next: ${d}`, snoozed: (n) => `Snoozed ${n} minutes`,
+      confirmClear: 'Remove all completed tasks & bought items?', cleaned: 'Cleaned up',
+      restored: 'Data restored', badBackup: 'Invalid backup file',
+      noTimed: 'No timed tasks to export', openIcs: 'Open the .ics file to add it to your Calendar',
+      calShop: '🛒 Check Ingat! app — items to buy', calMorning: "🌅 Check Ingat! app — today's tasks",
+      blocked: 'Notifications are blocked. Open browser/app settings → Site settings → Notifications → allow this site.',
+      timeToDo: "Time to do this! Don't put it off 😉", aDone: '✅ Done', aSnooze: '⏳ Snooze 10 min',
+      morningN: (n) => `🌅 ${n} things for today`, shopN: (n) => `🛒 Don't forget to buy (${n})`,
+      wait5: 'Wait 5 seconds…', allowFirst: 'Allow notifications first', testOk: '🔔 Test successful!', testBody: 'Ingat! notifications are working.'
+    }
+  };
+  const t = (k) => (L[S.settings.lang] || L.ms)[k];
+  const tr = t; // alias: dipakai di tempat yang variabel `t` ialah tugasan
+  function applyLang() {
+    document.documentElement.lang = S.settings.lang;
+    document.querySelectorAll('[data-t]').forEach((el) => { el.innerHTML = t(el.dataset.t); });
+    document.querySelectorAll('[data-tp]').forEach((el) => { el.placeholder = t(el.dataset.tp); });
+    $('#langBtn').textContent = S.settings.lang === 'ms' ? 'EN' : 'BM';
+    $('#fab').setAttribute('aria-label', tr('newTask'));
+    if (typeof renderInbox === 'function') try { renderInbox(); } catch {}
+  }
+
+  const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+  function save() {
+    try { localStorage.setItem(KEY, JSON.stringify(S)); } catch {}
+    // salinan untuk service worker (semakan latar belakang)
+    if ('caches' in window) caches.open('ingat-data').then((c) => c.put('./__ingat_data__', new Response(JSON.stringify(S)))).catch(() => {});
+    render();
+  }
+
+  // ---------- Masa ----------
+  const pad = (n) => String(n).padStart(2, '0');
+  const dayKey = (d = new Date()) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+  const toLocalInput = (ms) => { const d = new Date(ms); return `${dayKey(d)}T${pad(d.getHours())}:${pad(d.getMinutes())}`; };
+  function fmtTime(d) {
+    let h = d.getHours(); const m = pad(d.getMinutes());
+    const ap = tr('ampm')(h);
+    h = h % 12 || 12;
+    return `${h}:${m} ${ap}`;
+  }
+  function fmtDue(ms) {
+    const d = new Date(ms), now = new Date();
+    const diffDays = Math.round((new Date(d).setHours(0, 0, 0, 0) - new Date(now).setHours(0, 0, 0, 0)) / DAY);
+    const label = diffDays === 0 ? tr('today') : diffDays === 1 ? tr('tomorrow') : diffDays === -1 ? tr('yesterday')
+      : `${tr('days')[d.getDay()]}, ${d.getDate()} ${tr('months')[d.getMonth()]}`;
+    return `${label}, ${fmtTime(d)}`;
+  }
+  function ago(ms) {
+    const m = Math.round((Date.now() - ms) / 6e4);
+    if (m < 60) return tr('minAgo')(m);
+    if (m < 1440) return tr('hrAgo')(Math.round(m / 60));
+    return tr('dayAgo')(Math.round(m / 1440));
+  }
+  function nextOccurrence(ms, repeat) {
+    const d = new Date(ms);
+    const step = () => {
+      if (repeat === 'daily') d.setDate(d.getDate() + 1);
+      else if (repeat === 'weekly') d.setDate(d.getDate() + 7);
+      else if (repeat === 'monthly') d.setMonth(d.getMonth() + 1);
+    };
+    step();
+    while (d.getTime() <= Date.now()) step();
+    return d.getTime();
+  }
+
+  // ---------- Render ----------
+  const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+  function taskRow(t, late) {
+    let meta = '';
+    if (t.due) meta = late ? `${tr('missed')} · ${fmtDue(t.due)} (${ago(t.due)})` : fmtDue(t.due);
+    if (t.repeat && t.repeat !== 'none') meta += ` · 🔁 ${tr('rep')[t.repeat]}`;
+    if (t.note) meta += (meta ? ' · ' : '') + esc(t.note);
+    return `<div class="row ${late ? 'late' : ''} ${t.done ? 'done' : ''}" data-id="${t.id}">
+      <button class="chk ${t.done ? 'on' : ''}" data-act="toggle" aria-label="${tr('markDone')}">${t.done ? '✓' : ''}</button>
+      <div class="txt" data-act="edit"><div class="ttl">${esc(t.title)}</div>${meta ? `<div class="meta">${meta}</div>` : ''}</div>
+      ${t.due && !t.done ? `<button class="icon" data-act="ics" aria-label="${tr('toCal')}">📅</button>` : ''}
+    </div>`;
+  }
+  function group(title, list, cls = '', late = false) {
+    if (!list.length) return '';
+    return `<h2 class="${cls}">${title} (${list.length})</h2><div class="card">${list.map((t) => taskRow(t, late)).join('')}</div>`;
+  }
+
+  function render() {
+    const now = Date.now();
+    const endToday = new Date().setHours(23, 59, 59, 999);
+    const open = S.tasks.filter((t) => !t.done);
+    const byDue = (a, b) => a.due - b.due;
+    const late = open.filter((t) => t.due && t.due <= now).sort(byDue);
+    const today = open.filter((t) => t.due && t.due > now && t.due <= endToday).sort(byDue);
+    const later = open.filter((t) => t.due && t.due > endToday).sort(byDue);
+    const nodate = open.filter((t) => !t.due);
+    const done = S.tasks.filter((t) => t.done).slice(-15).reverse();
+
+    $('#tab-tasks').innerHTML = (open.length || done.length)
+      ? group(tr('gLate'), late, 'late', true) + group(tr('gToday'), today) + group(tr('gLater'), later) +
+        group(tr('gAny'), nodate) + group(tr('gDone'), done)
+      : `<div class="empty"><b>🧠</b>${tr('emptyTasks')}</div>`;
+
+    const toBuy = S.shop.filter((i) => !i.bought), bought = S.shop.filter((i) => i.bought);
+    const shopRow = (i) => `<div class="row ${i.bought ? 'done' : ''}" data-id="${i.id}">
+        <button class="chk ${i.bought ? 'on' : ''}" data-act="buy" aria-label="${tr('markBought')}">${i.bought ? '✓' : ''}</button>
+        <div class="txt"><div class="ttl">${esc(i.name)}</div>${i.from || i.note ? `<div class="meta">${[i.from ? tr('fromWho')(esc(i.from)) : '', esc(i.note || '')].filter(Boolean).join(' · ')}</div>` : ''}</div>
+        <button class="icon" data-act="del" aria-label="${tr('remove')}">✕</button></div>`;
+    $('#shopList').innerHTML = S.shop.length
+      ? (toBuy.length ? `<h2>${tr('toBuy')} (${toBuy.length})</h2><div class="card">${toBuy.map(shopRow).join('')}</div>` : '') +
+        (bought.length ? `<h2>${tr('bought')} (${bought.length})</h2><div class="card">${bought.map(shopRow).join('')}</div>` : '')
+      : `<div class="empty"><b>🛒</b>${tr('emptyShop')}</div>`;
+
+    $('#cTasks').textContent = open.length;
+    $('#cShop').textContent = toBuy.length;
+    const d = new Date();
+    $('#today').textContent = `${tr('days')[d.getDay()]}, ${d.getDate()} ${tr('months')[d.getMonth()]} ${d.getFullYear()}` +
+      (late.length ? ` · ${tr('nMissed')(late.length)}` : '');
+    $('#permBanner').classList.toggle('hidden', !('Notification' in window) || Notification.permission === 'granted');
+  }
+
+  // ---------- Tabs ----------
+  let tab = 'tasks';
+  function setTab(t) {
+    tab = t;
+    document.querySelectorAll('nav button').forEach((b) => b.classList.toggle('on', b.dataset.tab === t));
+    ['tasks', 'shop', 'set'].forEach((k) => $('#tab-' + k).classList.toggle('hidden', k !== t));
+    $('#fab').classList.toggle('hidden', t !== 'tasks');
+    try { localStorage.setItem('ingat-tab', t); } catch {}
+  }
+  document.querySelectorAll('nav button').forEach((b) => b.addEventListener('click', () => setTab(b.dataset.tab)));
+
+  // ---------- Toast ----------
+  let toastT;
+  function toast(msg) {
+    const el = $('#toast'); el.textContent = msg; el.classList.add('show');
+    clearTimeout(toastT); toastT = setTimeout(() => el.classList.remove('show'), 2600);
+  }
+
+  // ---------- Borang tugasan ----------
+  let editing = null;
+  function openSheet(t) {
+    editing = t || null;
+    $('#sheetTitle').textContent = t ? tr('editTask') : tr('newTask');
+    $('#fTitle').value = t ? t.title : '';
+    $('#fDue').value = t && t.due ? toLocalInput(t.due) : toLocalInput(Date.now() + 3600e3);
+    $('#fRepeat').value = t ? t.repeat || 'none' : 'none';
+    $('#fNote').value = t ? t.note || '' : '';
+    $('#fDelete').classList.toggle('hidden', !t);
+    $('#sheet').classList.add('open'); $('#sheetBg').classList.add('open');
+    setTimeout(() => $('#fTitle').focus(), 150);
+    askPermission();
+  }
+  function closeSheet() { $('#sheet').classList.remove('open'); $('#sheetBg').classList.remove('open'); editing = null; }
+  $('#fab').addEventListener('click', () => openSheet());
+  $('#fCancel').addEventListener('click', closeSheet);
+  $('#sheetBg').addEventListener('click', closeSheet);
+  $('#presets').addEventListener('click', (e) => {
+    const p = e.target.dataset.p; if (!p) return;
+    const d = new Date();
+    if (p === '30m') d.setMinutes(d.getMinutes() + 30);
+    if (p === '1h') d.setHours(d.getHours() + 1);
+    if (p === 'eve') { d.setHours(17, 0, 0, 0); if (d < new Date()) d.setDate(d.getDate() + 1); }
+    if (p === 'night') { d.setHours(21, 0, 0, 0); if (d < new Date()) d.setDate(d.getDate() + 1); }
+    if (p === 'tmr') { d.setDate(d.getDate() + 1); d.setHours(9, 0, 0, 0); }
+    $('#fDue').value = p === 'none' ? '' : toLocalInput(d.getTime());
+  });
+  $('#sheet').addEventListener('submit', (e) => {
+    e.preventDefault();
+    const title = $('#fTitle').value.trim(); if (!title) return;
+    const due = $('#fDue').value ? new Date($('#fDue').value).getTime() : null;
+    const data = { title, due, repeat: due ? $('#fRepeat').value : 'none', note: $('#fNote').value.trim() };
+    if (editing) {
+      if (editing.due !== due) editing.notifiedFor = null;
+      Object.assign(editing, data);
+    } else S.tasks.push({ id: uid(), done: false, notifiedFor: null, created: Date.now(), ...data });
+    closeSheet(); save(); scheduleTriggers();
+    toast(!due ? tr('saved') : due <= Date.now() ? tr('savedPast') : tr('willRemind')(fmtDue(due)));
+  });
+  $('#fDelete').addEventListener('click', () => {
+    if (!editing) return;
+    S.tasks = S.tasks.filter((t) => t !== editing); closeSheet(); save(); toast(tr('deleted'));
+  });
+
+  function completeTask(t) {
+    if (t.repeat && t.repeat !== 'none' && t.due) {
+      t.due = nextOccurrence(t.due, t.repeat); t.notifiedFor = null;
+      toast(tr('nextAt')(fmtDue(t.due)));
+    } else { t.done = true; t.doneAt = Date.now(); toast(tr('good')); }
+    save();
+  }
+  function snooze(t, mins = 10) { t.due = Date.now() + mins * 6e4; t.notifiedFor = null; save(); toast(tr('snoozed')(mins)); }
+
+  $('#tab-tasks').addEventListener('click', (e) => {
+    const row = e.target.closest('.row'); if (!row) return;
+    const t = S.tasks.find((x) => x.id === row.dataset.id); if (!t) return;
+    const act = e.target.closest('[data-act]')?.dataset.act;
+    if (act === 'toggle') { if (t.done) { t.done = false; save(); } else completeTask(t); }
+    else if (act === 'ics') downloadIcs([t], 'ingat-' + t.title.slice(0, 20));
+    else if (act === 'edit') openSheet(t);
+  });
+
+  // ---------- Barang ----------
+  $('#shopForm').addEventListener('submit', (e) => {
+    e.preventDefault();
+    const v = $('#shopInput').value.trim(); if (!v) return;
+    // boleh tampal banyak sekaligus: "telur, gula, roti"
+    v.split(/[,\n]+/).map((s) => s.trim()).filter(Boolean).reverse().forEach((name) => S.shop.unshift({ id: uid(), name, bought: false }));
+    $('#shopInput').value = ''; save(); askPermission();
+  });
+  $('#shopList').addEventListener('click', (e) => {
+    const row = e.target.closest('.row'); if (!row) return;
+    const i = S.shop.find((x) => x.id === row.dataset.id); if (!i) return;
+    const act = e.target.closest('[data-act]')?.dataset.act;
+    if (act === 'buy') { i.bought = !i.bought; save(); }
+    if (act === 'del') { S.shop = S.shop.filter((x) => x !== i); save(); }
+  });
+
+  // ---------- Tetapan ----------
+  $('#morningTime').value = S.settings.morningTime;
+  $('#shopTime').value = S.settings.shopTime;
+  $('#morningTime').addEventListener('change', (e) => { S.settings.morningTime = e.target.value; S.settings.lastMorning = ''; save(); });
+  $('#shopTime').addEventListener('change', (e) => { S.settings.shopTime = e.target.value; S.settings.lastShop = ''; save(); });
+  $('#clearDone').addEventListener('click', () => {
+    if (!confirm(tr('confirmClear'))) return;
+    S.tasks = S.tasks.filter((t) => !t.done); S.shop = S.shop.filter((i) => !i.bought); save(); toast(tr('cleaned'));
+  });
+  $('#backupBtn').addEventListener('click', () => {
+    download(new Blob([JSON.stringify(S, null, 2)], { type: 'application/json' }), `ingat-backup-${dayKey()}.json`);
+  });
+  $('#restoreBtn').addEventListener('click', () => $('#restoreFile').click());
+  $('#restoreFile').addEventListener('change', async (e) => {
+    const f = e.target.files[0]; if (!f) return;
+    try {
+      const d = JSON.parse(await f.text());
+      if (!Array.isArray(d.tasks) || !Array.isArray(d.shop)) throw 0;
+      S = Object.assign(defaults(), d); save(); toast(tr('restored'));
+    } catch { toast(tr('badBackup')); }
+  });
+
+  // ---------- Kalendar (.ics) ----------
+  function download(blob, name) {
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name;
+    document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+  }
+  const icsDate = (ms) => new Date(ms).toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '');
+  const icsEsc = (s) => String(s).replace(/\\/g, '\\\\').replace(/\n/g, '\\n').replace(/[,;]/g, (c) => '\\' + c);
+  function vevent({ uidv, start, title, desc, rrule }) {
+    return ['BEGIN:VEVENT', `UID:${uidv}@ingat`, `DTSTAMP:${icsDate(Date.now())}`, `DTSTART:${icsDate(start)}`,
+      `DTEND:${icsDate(start + 15 * 6e4)}`, `SUMMARY:${icsEsc(title)}`, desc ? `DESCRIPTION:${icsEsc(desc)}` : '',
+      rrule ? `RRULE:${rrule}` : '',
+      'BEGIN:VALARM', 'ACTION:DISPLAY', `DESCRIPTION:${icsEsc(title)}`, 'TRIGGER:PT0M', 'END:VALARM',
+      'END:VEVENT'].filter(Boolean).join('\r\n');
+  }
+  const RR = { daily: 'FREQ=DAILY', weekly: 'FREQ=WEEKLY', monthly: 'FREQ=MONTHLY' };
+  function timeToday(hhmm) { const [h, m] = hhmm.split(':').map(Number); const d = new Date(); d.setHours(h, m, 0, 0); if (d < new Date()) d.setDate(d.getDate() + 1); return d.getTime(); }
+  function downloadIcs(tasks, name, extra = []) {
+    const evs = tasks.filter((t) => t.due && !t.done).map((t) => vevent({ uidv: t.id, start: t.due, title: '🔔 ' + t.title, desc: t.note, rrule: RR[t.repeat] }));
+    const all = evs.concat(extra);
+    if (!all.length) return toast(tr('noTimed'));
+    const ics = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Ingat//MS', 'CALSCALE:GREGORIAN', ...all, 'END:VCALENDAR'].join('\r\n');
+    download(new Blob([ics], { type: 'text/calendar' }), name.replace(/[^\w-]+/g, '_') + '.ics');
+    toast(tr('openIcs'));
+  }
+  $('#icsAll').addEventListener('click', () => {
+    const extra = [];
+    if (S.settings.shopTime) extra.push(vevent({ uidv: 'shop-daily', start: timeToday(S.settings.shopTime), title: tr('calShop'), rrule: 'FREQ=DAILY' }));
+    if (S.settings.morningTime) extra.push(vevent({ uidv: 'morning-daily', start: timeToday(S.settings.morningTime), title: tr('calMorning'), rrule: 'FREQ=DAILY' }));
+    downloadIcs(S.tasks, 'ingat-semua', extra);
+  });
+
+  // ---------- Notifikasi ----------
+  let swReg = null;
+  async function askPermission() {
+    if (!('Notification' in window) || Notification.permission !== 'default') return;
+    try { await Notification.requestPermission(); } catch {}
+    render(); registerPeriodic();
+  }
+  $('#permBtn').addEventListener('click', async () => {
+    if (Notification.permission === 'denied') {
+      alert(tr('blocked'));
+      return;
+    }
+    await askPermission();
+  });
+
+  async function notify(title, body, opts = {}) {
+    if (!('Notification' in window) || Notification.permission !== 'granted') return false;
+    const o = { body, icon: 'icon-192.png', badge: 'icon-192.png', vibrate: [200, 100, 200, 100, 300], ...opts };
+    try {
+      const reg = swReg || (await navigator.serviceWorker?.ready);
+      if (reg) { await reg.showNotification(title, o); return true; }
+    } catch {}
+    try { delete o.actions; new Notification(title, o); return true; } catch { return false; }
+  }
+
+  function check() {
+    const now = Date.now(); let changed = false;
+    for (const t of S.tasks) {
+      if (!t.done && t.due && t.due <= now && t.notifiedFor !== t.due) {
+        notify('⏰ ' + t.title, t.note || tr('timeToDo'), {
+          tag: 'task-' + t.id, requireInteraction: true, data: { id: t.id },
+          actions: [{ action: 'done', title: tr('aDone') }, { action: 'snooze', title: tr('aSnooze') }]
+        });
+        t.notifiedFor = t.due; changed = true;
+      }
+    }
+    const today = dayKey(), hhmm = `${pad(new Date().getHours())}:${pad(new Date().getMinutes())}`;
+    const st = S.settings;
+    if (st.morningTime && hhmm >= st.morningTime && st.lastMorning !== today) {
+      const end = new Date().setHours(23, 59, 59, 999);
+      const list = S.tasks.filter((t) => !t.done && (!t.due || t.due <= end));
+      if (list.length) notify(tr('morningN')(list.length), list.slice(0, 6).map((t) => '• ' + t.title).join('\n'), { tag: 'morning' });
+      st.lastMorning = today; changed = true;
+    }
+    if (st.shopTime && hhmm >= st.shopTime && st.lastShop !== today) {
+      const items = S.shop.filter((i) => !i.bought);
+      if (items.length) notify(tr('shopN')(items.length), items.slice(0, 8).map((i) => i.name).join(', '), { tag: 'shop', requireInteraction: true });
+      st.lastShop = today; changed = true;
+    }
+    if (changed) save(); else render();
+  }
+
+  // Notification Triggers (jika pelayar sokong) — notifikasi berjadual walaupun app ditutup
+  async function scheduleTriggers() {
+    if (!('showTrigger' in Notification.prototype) || !('TimestampTrigger' in window) || Notification.permission !== 'granted') return;
+    const reg = swReg || (await navigator.serviceWorker?.ready); if (!reg) return;
+    for (const t of S.tasks) {
+      if (t.done || !t.due || t.due <= Date.now()) continue;
+      try {
+        await reg.showNotification('⏰ ' + t.title, {
+          body: t.note || tr('timeToDo'), tag: 'task-' + t.id, data: { id: t.id }, icon: 'icon-192.png',
+          showTrigger: new TimestampTrigger(t.due), // eslint-disable-line no-undef
+          actions: [{ action: 'done', title: tr('aDone') }, { action: 'snooze', title: tr('aSnooze') }]
+        });
+      } catch {}
+    }
+  }
+
+  async function registerPeriodic() {
+    try {
+      const reg = swReg || (await navigator.serviceWorker?.ready);
+      if (reg && 'periodicSync' in reg) {
+        const st = await navigator.permissions.query({ name: 'periodic-background-sync' });
+        if (st.state === 'granted') await reg.periodicSync.register('ingat-check', { minInterval: 15 * 6e4 });
+      }
+    } catch {}
+  }
+
+  function handleAction(act, id) {
+    const t = S.tasks.find((x) => x.id === id); if (!t) return;
+    if (act === 'done') completeTask(t);
+    else if (act === 'snooze') { snooze(t, 10); scheduleTriggers(); }
+    else { setTab('tasks'); }
+  }
+
+  $('#testBtn').addEventListener('click', async () => {
+    await askPermission();
+    if (Notification.permission !== 'granted') return toast(tr('allowFirst'));
+    toast(tr('wait5'));
+    setTimeout(() => notify(tr('testOk'), tr('testBody'), { tag: 'test' }), 5000);
+  });
+
+  // ---------- Install ----------
+  let deferredPrompt = null;
+  window.addEventListener('beforeinstallprompt', (e) => { e.preventDefault(); deferredPrompt = e; $('#installRow').classList.remove('hidden'); });
+  $('#installBtn').addEventListener('click', async () => { if (!deferredPrompt) return; deferredPrompt.prompt(); await deferredPrompt.userChoice; deferredPrompt = null; $('#installRow').classList.add('hidden'); });
+  if (matchMedia('(display-mode: standalone)').matches) $('#installCard').classList.add('hidden');
+
+  // ---------- Mula ----------
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('sw.js').then((r) => { swReg = r; registerPeriodic(); scheduleTriggers(); }).catch(() => {});
+    navigator.serviceWorker.addEventListener('message', (e) => e.data && handleAction(e.data.act, e.data.id));
+  }
+  const q = new URLSearchParams(location.search);
+  if (q.get('act') && q.get('id')) { handleAction(q.get('act'), q.get('id')); history.replaceState(null, '', location.pathname); }
+
+  $('#langBtn').addEventListener('click', () => { S.settings.lang = S.settings.lang === 'ms' ? 'en' : 'ms'; applyLang(); save(); scheduleTriggers(); });
+  applyLang();
+  try { setTab(localStorage.getItem('ingat-tab') || 'tasks'); } catch { setTab('tasks'); }
+  save();
+  check();
+  setInterval(check, 15000);
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) { check(); syncInbox(); } });
+
+  // ---------- Peti masuk dari borang (Google Apps Script) ----------
+  const validUrl = (u) => /^https:\/\/script\.google(usercontent)?\.com\/\S+$/.test(u);
+  const formLink = () => new URL('minta.html', location.href).href.split('?')[0] + '#u=' + encodeURIComponent(S.settings.inboxUrl);
+  let syncing = false, lastSyncAt = 0;
+  async function syncInbox(manual) {
+    const url = S.settings.inboxUrl;
+    if (!url || syncing || !navigator.onLine) return;
+    syncing = true;
+    try {
+      const res = await fetch(url + (url.includes('?') ? '&' : '?') + 'action=list');
+      const j = await res.json();
+      if (j.result !== 'success') throw new Error(j.message);
+      const seen = new Set(S.inboxSeen || []);
+      const fresh = (j.items || []).filter((x) => x && x.id && !seen.has(x.id));
+      fresh.slice().reverse().forEach((x) => {
+        S.shop.unshift({ id: uid(), name: String(x.item).slice(0, 200), from: String(x.from || '').slice(0, 60), note: String(x.note || '').slice(0, 300), bought: false });
+        seen.add(x.id);
+      });
+      S.inboxSeen = [...seen].slice(-1000);
+      lastSyncAt = Date.now();
+      if (fresh.length) {
+        save();
+        const who = [...new Set(fresh.map((x) => x.from).filter((f) => f && f !== '—'))].join(', ') || tr('someone');
+        notify(tr('newItemsN')(who, fresh.length), fresh.slice(0, 8).map((x) => x.item).join(', '), { tag: 'inbox', requireInteraction: true });
+      }
+      const all = (j.items || []).map((x) => x.id).filter(Boolean);
+      if (all.length) fetch(url + (url.includes('?') ? '&' : '?') + 'action=ack&ids=' + encodeURIComponent(all.join(','))).catch(() => {});
+      if (manual) toast(tr('syncOk')(fresh.length));
+    } catch (e) {
+      if (manual) toast(tr('syncFail'));
+    } finally { syncing = false; renderInbox(); }
+  }
+  function renderInbox() {
+    $('#inboxUrl').value = S.settings.inboxUrl || '';
+    $('#shareBox').classList.toggle('hidden', !S.settings.inboxUrl);
+    $('#inboxStatus').textContent = lastSyncAt ? tr('lastSync')(fmtTime(new Date(lastSyncAt))) : '';
+  }
+  $('#inboxSave').addEventListener('click', () => {
+    const u = $('#inboxUrl').value.trim();
+    if (u && !validUrl(u)) return toast(tr('badUrl'));
+    S.settings.inboxUrl = u; save(); renderInbox();
+    if (u) { toast(tr('urlSaved')); syncInbox(true); }
+  });
+  $('#inboxSync').addEventListener('click', () => syncInbox(true));
+  $('#shareBtn').addEventListener('click', async () => {
+    const link = formLink();
+    if (navigator.share) { try { await navigator.share({ title: 'Ingat!', text: tr('shareMsg'), url: link }); return; } catch (e) { if (e.name === 'AbortError') return; } }
+    try { await navigator.clipboard.writeText(link); toast(tr('linkCopied')); } catch { prompt('Link:', link); }
+  });
+  $('#waBtn').addEventListener('click', () => {
+    window.open('https://wa.me/?text=' + encodeURIComponent(tr('shareMsg') + '\n' + formLink()), '_blank');
+  });
+  renderInbox();
+  syncInbox();
+  setInterval(() => { if (!document.hidden) syncInbox(); }, 60000);
+})();
+</script>
+</body>
+</html>
