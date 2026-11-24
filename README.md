@@ -7,7 +7,12 @@ App web (PWA) yang dipasang terus ke skrin utama fon. Tak perlu Play Store. Data
 ## Apa yang app ni buat
 
 - **Tugasan**: tambah kerja dengan masa peringatan. Ada butang pantas (+30 min, petang ni, esok pagi...). Boleh ulang setiap hari/minggu/bulan.
-- **Terlepas**: kerja yang dah lepas masa ditunjuk warna merah di atas sekali, sampai kau tanda selesai.
+- **Sehingga 4 masa untuk satu tugasan** (cth makan ubat 9:00, 12:00, 3:00, 5:00): dalam borang tekan **+ Tambah masa**, dan tekan ✕ untuk buang satu masa.
+  - Setiap masa keluar notifikasi sendiri, dengan tanda (1/4), (2/4) dan seterusnya.
+  - **Selesai** / **Tunda 10 min** pada notifikasi hanya untuk masa tu sahaja. Bila semua masa dah selesai, tugasan dikira siap (atau berulang).
+  - Tanda ✓ dalam senarai = selesai seluruh tugasan. Kalau berulang, **semua masa** dianjak ke hari/minggu/bulan seterusnya.
+  - Eksport Kalendar buat satu acara + alarm untuk setiap masa.
+- **Terlepas**: kerja ditunjuk merah di atas sekali hanya selepas **masa terakhir** lalu, sampai kau tanda selesai.
 - **Nak Beli**: senarai barang. Taip banyak sekaligus dengan koma: `telur, gula, roti`.
 - **Notifikasi**:
   - ⏰ bila sampai masa tugasan (ada butang **Selesai** / **Tunda 10 min**)
@@ -25,7 +30,9 @@ Fon (terutamanya Android dengan penjimat bateri, dan iPhone) akan **tidurkan app
 
 ## Cara pasang di fon / Install on your phone
 
-**Link app / App link: https://msyahmies.github.io/ingat/**
+**Link app / App link: https://ingat-h7u.pages.dev**
+
+App dihoskan di **Cloudflare Pages** dan auto-deploy dari branch `main` repo ni. Setiap push ke `main` = versi baru dalam 1–2 minit. / Hosted on Cloudflare Pages, auto-deployed from `main`.
 
 1. Buka link tu di fon. / Open the link on your phone.
    - **Android (Chrome):** menu ⋮ → **Install app / Add to Home screen**
@@ -85,7 +92,7 @@ Perlu akaun Cloudflare percuma: [dash.cloudflare.com/sign-up](https://dash.cloud
 1. Dalam app Ingat!: **Tetapan → Terima senarai dari orang lain**, tampal URL Worker → **Simpan URL**. Di bawah butang akan tertulis **Guna: Cloudflare Worker**.
 2. Tekan **💬 Hantar melalui WhatsApp** atau **📤 Kongsi link borang** untuk hantar link kepada isteri / keluarga.
 
-> Worker hanya terima permintaan dari `https://msyahmies.github.io` (CORS). Kalau app dipindah ke domain lain, tambah variable **`ALLOWED_ORIGINS`** (Settings → Variables and Secrets → Add → Text) dengan nilai origin baru, dipisah koma: `https://msyahmies.github.io,https://domain-baru.com`.
+> Secara default Worker hanya terima permintaan dari `https://ingat-h7u.pages.dev` dan `https://msyahmies.github.io` (CORS). Kalau app dipindah ke domain lain, set variable **`ALLOWED_ORIGINS`** (Settings → Variables and Secrets → Add → Text) dengan senarai origin dipisah koma, cth: `https://ingat-h7u.pages.dev,https://domain-baru.com`. Bila `ALLOWED_ORIGINS` diset, ia **ganti** senarai default.
 
 <a id="setup-telegram"></a>
 
@@ -156,8 +163,8 @@ Ujian `worker.js` dengan KV & Telegram palsu ([`tests/worker.test.mjs`](tests/wo
 
 ## English summary
 
-- **Tasks:** add things to do with a reminder time, quick buttons (+30 min, this evening, tomorrow morning), repeat daily/weekly/monthly. Missed tasks stay red at the top until you tick them.
+- **Tasks:** add things to do with up to **4 reminder times** each (tap **+ Add time**, ✕ to remove), quick buttons (+30 min, this evening, tomorrow morning), repeat daily/weekly/monthly (all times repeat). Each time gets its own notification (1/4, 2/4…); **Done / Snooze** on a notification applies to that time only. A task turns red (missed) only after its **last** time has passed. Calendar export adds an event + alarm for every time.
 - **To Buy:** shopping list; type several at once with commas: `eggs, sugar, bread`.
 - **Notifications:** at the task time (with **Done / Snooze 10 min** buttons), a morning summary (default 8:00 AM) and an "items not bought yet" reminder (default 5:30 PM).
 - **Limitation:** phones put web apps to sleep when closed, so notifications may be late. For important things, tap 📅 to add them to your phone's Calendar, which always rings.
-- **Install:** open https://msyahmies.github.io/ingat/ on your phone → Android Chrome: menu ⋮ → *Install app*; iPhone Safari: Share → *Add to Home Screen*. Then tap **Allow notifications** and try **Settings → Send test notification**.
+- **Install:** open https://ingat-h7u.pages.dev on your phone → Android Chrome: menu ⋮ → *Install app*; iPhone Safari: Share → *Add to Home Screen*. Then tap **Allow notifications** and try **Settings → Send test notification**.

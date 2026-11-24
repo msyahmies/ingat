@@ -101,6 +101,8 @@ test('CORS: github.io dibenarkan, origin lain tidak, preflight OK', async () => 
   const env = mkEnv();
   const ok = await post(env, { items: 'a' });
   assert.equal(ok.headers.get('Access-Control-Allow-Origin'), ORIGIN);
+  const pages = await post(env, { items: 'a' }, 'https://ingat-h7u.pages.dev');
+  assert.equal(pages.headers.get('Access-Control-Allow-Origin'), 'https://ingat-h7u.pages.dev');
   const bad = await post(env, { items: 'a' }, 'https://evil.example');
   assert.equal(bad.headers.get('Access-Control-Allow-Origin'), null);
   const pre = await worker.fetch(new Request(BASE, { method: 'OPTIONS', headers: { Origin: ORIGIN } }), env, {});

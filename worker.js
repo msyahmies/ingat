@@ -11,14 +11,15 @@
  *
  * Binding / tetapan (Settings → Variables / Bindings):
  *   LIST              KV namespace (wajib)
- *   ALLOWED_ORIGINS   (pilihan) senarai origin dipisah koma. Default: https://msyahmies.github.io
+ *   ALLOWED_ORIGINS   (pilihan) senarai origin dipisah koma (ganti default).
+ *                     Default: https://ingat-h7u.pages.dev, https://msyahmies.github.io
  *   TELEGRAM_TOKEN    (pilihan, Secret) token bot dari @BotFather
  *   TELEGRAM_CHAT_ID  (pilihan) chat id kau
  *
  * Langkah setup penuh: https://github.com/msyahmies/ingat#setup-cloudflare
  */
 
-const DEFAULT_ORIGINS = 'https://msyahmies.github.io';
+const DEFAULT_ORIGINS = 'https://ingat-h7u.pages.dev,https://msyahmies.github.io';
 const PREFIX = 'item:';
 const TTL_SECONDS = 60 * 60 * 24 * 30; // barang dibuang automatik selepas 30 hari
 const MAX_ITEMS = 50;

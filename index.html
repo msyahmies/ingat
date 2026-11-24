@@ -74,6 +74,14 @@
   .set p a{color:var(--brand);font-weight:600}
   .set .card{padding:14px}
   .set .card+.card{margin-top:12px}
+  .trow{display:flex;gap:8px;align-items:center;margin-top:8px}
+  .trow:first-child{margin-top:0}
+  .trow .num{flex:none;width:26px;height:26px;border-radius:50%;background:var(--soft);color:var(--brand);font:700 13px system-ui;display:grid;place-items:center}
+  .trow input{flex:1;min-width:0}
+  .trow.active input{border-color:var(--brand);box-shadow:0 0 0 2px var(--soft)}
+  .addtime{margin-top:8px;color:var(--brand);font-weight:700;border-color:var(--brand);background:var(--card)}
+  .fhint{font-size:12px;color:var(--mute);margin:6px 2px 0}
+  .meta .past{opacity:.55}
   .hidden{display:none!important}
 </style>
 </head>
@@ -170,8 +178,10 @@
   <h3 id="sheetTitle">Tugasan baru</h3>
   <label for="fTitle" data-t="fTitleL">Apa yang perlu dibuat?</label>
   <input id="fTitle" required data-tp="fTitlePh" placeholder="cth: Bayar bil TNB">
-  <label for="fDue" data-t="fDueL">Ingatkan aku pada</label>
-  <input type="datetime-local" id="fDue">
+  <label data-t="fDueL">Ingatkan aku pada</label>
+  <div id="fTimes"></div>
+  <button type="button" class="chip addtime" id="fAddTime" data-t="addTime">+ Tambah masa</button>
+  <p class="fhint" data-t="timesHint">Sehingga 4 masa. Butang pantas di bawah tukar masa yang dipilih.</p>
   <div class="chips" id="presets">
     <button type="button" class="chip" data-p="30m">+30 min</button>
     <button type="button" class="chip" data-p="1h" data-t="p1h">+1 jam</button>
@@ -212,6 +222,29 @@
   S.settings = Object.assign(defaults().settings, S.settings);
   if (!S.settings.lang) S.settings.lang = /^(ms|id)/i.test(navigator.language || '') ? 'ms' : 'en';
 
+  // ---------- Model berbilang masa / multi-time model ----------
+  // Setiap tugasan: times[] = masa asal (ms, maks 4) · snoozed{asal: masa baru} · acked[] = masa asal yang dah "Selesai"
+  // · notified[] = masa efektif yang dah dinotifikasi. Data lama { due, notifiedFor } ditukar automatik.
+  const MAX_TIMES = 4;
+  function migrateTask(t) {
+    if (!Array.isArray(t.times)) t.times = Number.isFinite(t.due) ? [t.due] : [];
+    t.times = [...new Set(t.times.map(Number).filter(Number.isFinite))].sort((a, b) => a - b).slice(0, MAX_TIMES);
+    if (!Array.isArray(t.notified)) t.notified = Number.isFinite(t.notifiedFor) && t.times.includes(t.notifiedFor) ? [t.notifiedFor] : [];
+    if (!Array.isArray(t.acked)) t.acked = [];
+    if (!t.snoozed || typeof t.snoozed !== 'object') t.snoozed = {};
+    if (!t.repeat) t.repeat = 'none';
+    delete t.due; delete t.notifiedFor;
+    return t;
+  }
+  S.tasks.forEach(migrateTask);
+  const slots = (t) => t.times.map((base, i) => ({ base, i, at: Number(t.snoozed[base]) || base, acked: t.acked.includes(base) }));
+  const pending = (t) => slots(t).filter((x) => !x.acked);
+  const lastAt = (t) => { const p = pending(t); return p.length ? Math.max(...p.map((x) => x.at)) : null; };
+  const nextAt = (t, now = Date.now()) => { const f = pending(t).map((x) => x.at).filter((x) => x > now); return f.length ? Math.min(...f) : null; };
+  // "Terlepas" hanya selepas masa TERAKHIR lalu / missed only after the LAST time has passed
+  const isLate = (t, now = Date.now()) => !t.done && t.times.length > 0 && nextAt(t, now) === null;
+  const pruneNotified = (t) => { const ats = slots(t).map((x) => x.at); t.notified = t.notified.filter((x) => ats.includes(x)); };
+
   // ---------- Bahasa / Language ----------
   const L = {
     ms: {
@@ -239,6 +272,9 @@
       fTitleL: 'Apa yang perlu dibuat?', fTitlePh: 'cth: Bayar bil TNB', fDueL: 'Ingatkan aku pada',
       p1h: '+1 jam', pEve: 'Petang ni 5:00', pNight: 'Malam ni 9:00', pTmr: 'Esok 9:00 pagi', pNone: 'Tiada masa',
       fRepeatL: 'Ulang', rNone: 'Sekali sahaja', rDaily: 'Setiap hari', rWeekly: 'Setiap minggu', rMonthly: 'Setiap bulan',
+      addTime: '+ Tambah masa', rmTime: 'Buang masa', timeN: (n) => `Masa ${n}`,
+      timesHint: 'Sehingga 4 masa. Butang pantas di bawah tukar masa yang dipilih.',
+      plusMore: (n) => ` (+${n} masa lagi)`,
       fNoteL: 'Nota (pilihan)', fNotePh: 'cth: no akaun 2200...', del: 'Padam', cancel: 'Batal', save: 'Simpan',
       days: ['Ahad', 'Isnin', 'Selasa', 'Rabu', 'Khamis', 'Jumaat', 'Sabtu'],
       months: ['Jan', 'Feb', 'Mac', 'Apr', 'Mei', 'Jun', 'Jul', 'Ogo', 'Sep', 'Okt', 'Nov', 'Dis'],
@@ -256,7 +292,7 @@
       deleted: 'Dipadam', good: 'Bagus! ✅', nextAt: (d) => `Bagus! Seterusnya: ${d}`, snoozed: (n) => `Ditunda ${n} minit`,
       confirmClear: 'Buang semua tugasan selesai & barang yang dah dibeli?', cleaned: 'Dibersihkan',
       restored: 'Data dipulihkan', badBackup: 'Fail backup tak sah',
-      noTimed: 'Tiada tugasan bermasa untuk dieksport', openIcs: 'Buka fail .ics tu untuk masukkan ke Kalendar',
+      noTimed: 'Tiada peringatan akan datang untuk dieksport', openIcs: 'Buka fail .ics tu untuk masukkan ke Kalendar',
       calShop: '🛒 Semak app Ingat! — barang nak beli', calMorning: '🌅 Semak app Ingat! — kerja hari ni',
       blocked: 'Notifikasi telah disekat. Buka tetapan pelayar/app → Site settings → Notifications → benarkan untuk laman ini.',
       timeToDo: 'Masa untuk buat ni! Jangan tangguh 😉', aDone: '✅ Selesai', aSnooze: '⏳ Tunda 10 min',
@@ -288,6 +324,9 @@
       fTitleL: 'What do you need to do?', fTitlePh: 'e.g. Pay electricity bill', fDueL: 'Remind me at',
       p1h: '+1 hour', pEve: 'This evening 5:00', pNight: 'Tonight 9:00', pTmr: 'Tomorrow 9:00 AM', pNone: 'No time',
       fRepeatL: 'Repeat', rNone: 'Once only', rDaily: 'Every day', rWeekly: 'Every week', rMonthly: 'Every month',
+      addTime: '+ Add time', rmTime: 'Remove time', timeN: (n) => `Time ${n}`,
+      timesHint: 'Up to 4 times. The quick buttons below change the selected time.',
+      plusMore: (n) => ` (+${n} more)`,
       fNoteL: 'Note (optional)', fNotePh: 'e.g. account no 2200...', del: 'Delete', cancel: 'Cancel', save: 'Save',
       days: ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'],
       months: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
@@ -305,7 +344,7 @@
       deleted: 'Deleted', good: 'Nice! ✅', nextAt: (d) => `Nice! Next: ${d}`, snoozed: (n) => `Snoozed ${n} minutes`,
       confirmClear: 'Remove all completed tasks & bought items?', cleaned: 'Cleaned up',
       restored: 'Data restored', badBackup: 'Invalid backup file',
-      noTimed: 'No timed tasks to export', openIcs: 'Open the .ics file to add it to your Calendar',
+      noTimed: 'No upcoming reminders to export', openIcs: 'Open the .ics file to add it to your Calendar',
       calShop: '🛒 Check Ingat! app — items to buy', calMorning: "🌅 Check Ingat! app — today's tasks",
       blocked: 'Notifications are blocked. Open browser/app settings → Site settings → Notifications → allow this site.',
       timeToDo: "Time to do this! Don't put it off 😉", aDone: '✅ Done', aSnooze: '⏳ Snooze 10 min',
@@ -321,6 +360,7 @@
     document.querySelectorAll('[data-tp]').forEach((el) => { el.placeholder = t(el.dataset.tp); });
     $('#langBtn').textContent = S.settings.lang === 'ms' ? 'EN' : 'BM';
     $('#fab').setAttribute('aria-label', tr('newTask'));
+    if (document.querySelector('#fTimes .trow')) try { renumberRows(); } catch {}
     if (typeof renderInbox === 'function') try { renderInbox(); } catch {}
   }
 
@@ -342,43 +382,61 @@
     h = h % 12 || 12;
     return `${h}:${m} ${ap}`;
   }
-  function fmtDue(ms) {
-    const d = new Date(ms), now = new Date();
-    const diffDays = Math.round((new Date(d).setHours(0, 0, 0, 0) - new Date(now).setHours(0, 0, 0, 0)) / DAY);
-    const label = diffDays === 0 ? tr('today') : diffDays === 1 ? tr('tomorrow') : diffDays === -1 ? tr('yesterday')
-      : `${tr('days')[d.getDay()]}, ${d.getDate()} ${tr('months')[d.getMonth()]}`;
-    return `${label}, ${fmtTime(d)}`;
-  }
+  function fmtDue(ms) { return `${dayLabel(ms)}, ${fmtTime(new Date(ms))}`; }
   function ago(ms) {
     const m = Math.round((Date.now() - ms) / 6e4);
     if (m < 60) return tr('minAgo')(m);
     if (m < 1440) return tr('hrAgo')(Math.round(m / 60));
     return tr('dayAgo')(Math.round(m / 1440));
   }
-  function nextOccurrence(ms, repeat) {
+  function stepTime(ms, repeat, n) {
     const d = new Date(ms);
-    const step = () => {
-      if (repeat === 'daily') d.setDate(d.getDate() + 1);
-      else if (repeat === 'weekly') d.setDate(d.getDate() + 7);
-      else if (repeat === 'monthly') d.setMonth(d.getMonth() + 1);
-    };
-    step();
-    while (d.getTime() <= Date.now()) step();
+    if (repeat === 'daily') d.setDate(d.getDate() + n);
+    else if (repeat === 'weekly') d.setDate(d.getDate() + 7 * n);
+    else if (repeat === 'monthly') d.setMonth(d.getMonth() + n);
     return d.getTime();
+  }
+  // Ulang: anjak SEMUA masa dengan langkah yang sama sehingga masa pertama selepas sekarang
+  function advanceTimes(t) {
+    const first = t.times[0];
+    let n = 1;
+    while (stepTime(first, t.repeat, n) <= Date.now() && n < 5000) n++;
+    t.times = t.times.map((x) => stepTime(x, t.repeat, n));
+    t.snoozed = {}; t.acked = []; t.notified = [];
+  }
+  function dayLabel(ms) {
+    const d = new Date(ms), now = new Date();
+    const diffDays = Math.round((new Date(d).setHours(0, 0, 0, 0) - new Date(now).setHours(0, 0, 0, 0)) / DAY);
+    return diffDays === 0 ? tr('today') : diffDays === 1 ? tr('tomorrow') : diffDays === -1 ? tr('yesterday')
+      : `${tr('days')[d.getDay()]}, ${d.getDate()} ${tr('months')[d.getMonth()]}`;
   }
 
   // ---------- Render ----------
   const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
+  function timesMeta(t, late) {
+    const ss = slots(t);
+    if (!ss.length) return '';
+    if (ss.length === 1) { const at = ss[0].at; return late ? `${tr('missed')} · ${fmtDue(at)} (${ago(at)})` : fmtDue(at); }
+    const now = Date.now(), next = nextAt(t, now);
+    const sameDay = ss.every((x) => dayKey(new Date(x.at)) === dayKey(new Date(ss[0].at)));
+    const parts = ss.map((x) => {
+      const txt = sameDay ? fmtTime(new Date(x.at)) : fmtDue(x.at);
+      if (x.acked) return `<span class="past">✓ ${txt}</span>`;
+      if (!t.done && x.at === next) return `<b>${txt}</b>`;
+      return x.at <= now ? `<span class="past">${txt}</span>` : txt;
+    }).join(', ');
+    const head = sameDay ? `${dayLabel(ss[0].at)}: ` : '';
+    return late ? `${tr('missed')} · ${head}${parts} (${ago(lastAt(t))})` : head + parts;
+  }
   function taskRow(t, late) {
-    let meta = '';
-    if (t.due) meta = late ? `${tr('missed')} · ${fmtDue(t.due)} (${ago(t.due)})` : fmtDue(t.due);
+    let meta = timesMeta(t, late);
     if (t.repeat && t.repeat !== 'none') meta += ` · 🔁 ${tr('rep')[t.repeat]}`;
     if (t.note) meta += (meta ? ' · ' : '') + esc(t.note);
     return `<div class="row ${late ? 'late' : ''} ${t.done ? 'done' : ''}" data-id="${t.id}">
       <button class="chk ${t.done ? 'on' : ''}" data-act="toggle" aria-label="${tr('markDone')}">${t.done ? '✓' : ''}</button>
       <div class="txt" data-act="edit"><div class="ttl">${esc(t.title)}</div>${meta ? `<div class="meta">${meta}</div>` : ''}</div>
-      ${t.due && !t.done ? `<button class="icon" data-act="ics" aria-label="${tr('toCal')}">📅</button>` : ''}
+      ${t.times.length && !t.done ? `<button class="icon" data-act="ics" aria-label="${tr('toCal')}">📅</button>` : ''}
     </div>`;
   }
   function group(title, list, cls = '', late = false) {
@@ -390,11 +448,12 @@
     const now = Date.now();
     const endToday = new Date().setHours(23, 59, 59, 999);
     const open = S.tasks.filter((t) => !t.done);
-    const byDue = (a, b) => a.due - b.due;
-    const late = open.filter((t) => t.due && t.due <= now).sort(byDue);
-    const today = open.filter((t) => t.due && t.due > now && t.due <= endToday).sort(byDue);
-    const later = open.filter((t) => t.due && t.due > endToday).sort(byDue);
-    const nodate = open.filter((t) => !t.due);
+    const byNext = (a, b) => nextAt(a, now) - nextAt(b, now);
+    const late = open.filter((t) => isLate(t, now)).sort((a, b) => lastAt(a) - lastAt(b));
+    const timed = open.filter((t) => t.times.length && !isLate(t, now));
+    const today = timed.filter((t) => nextAt(t, now) <= endToday).sort(byNext);
+    const later = timed.filter((t) => nextAt(t, now) > endToday).sort(byNext);
+    const nodate = open.filter((t) => !t.times.length);
     const done = S.tasks.filter((t) => t.done).slice(-15).reverse();
 
     $('#tab-tasks').innerHTML = (open.length || done.length)
@@ -444,7 +503,9 @@
     editing = t || null;
     $('#sheetTitle').textContent = t ? tr('editTask') : tr('newTask');
     $('#fTitle').value = t ? t.title : '';
-    $('#fDue').value = t && t.due ? toLocalInput(t.due) : toLocalInput(Date.now() + 3600e3);
+    $('#fTimes').innerHTML = '';
+    (t ? t.times : [Date.now() + 3600e3]).forEach((ms) => addTimeRow(ms));
+    setActiveRow($('#fTimes .trow'));
     $('#fRepeat').value = t ? t.repeat || 'none' : 'none';
     $('#fNote').value = t ? t.note || '' : '';
     $('#fDelete').classList.toggle('hidden', !t);
@@ -456,6 +517,39 @@
   $('#fab').addEventListener('click', () => openSheet());
   $('#fCancel').addEventListener('click', closeSheet);
   $('#sheetBg').addEventListener('click', closeSheet);
+  // Baris masa (maks 4) / time rows (max 4)
+  const timeRows = () => [...document.querySelectorAll('#fTimes .trow')];
+  function renumberRows() {
+    timeRows().forEach((r, i) => {
+      r.querySelector('.num').textContent = i + 1;
+      r.querySelector('input').setAttribute('aria-label', tr('timeN')(i + 1));
+      r.querySelector('[data-rm]').setAttribute('aria-label', tr('rmTime') + ' ' + (i + 1));
+    });
+    $('#fAddTime').classList.toggle('hidden', timeRows().length >= MAX_TIMES);
+  }
+  function setActiveRow(r) { timeRows().forEach((x) => x.classList.toggle('active', x === r)); }
+  function addTimeRow(ms) {
+    if (timeRows().length >= MAX_TIMES) return null;
+    const r = document.createElement('div');
+    r.className = 'trow';
+    r.innerHTML = '<span class="num"></span><input type="datetime-local" class="ftime"><button type="button" class="icon" data-rm>✕</button>';
+    if (ms) r.querySelector('input').value = toLocalInput(ms);
+    $('#fTimes').appendChild(r);
+    renumberRows();
+    return r;
+  }
+  $('#fTimes').addEventListener('focusin', (e) => { const r = e.target.closest('.trow'); if (r) setActiveRow(r); });
+  $('#fTimes').addEventListener('click', (e) => {
+    const rm = e.target.closest('[data-rm]'); if (!rm) return;
+    const r = rm.closest('.trow'), wasActive = r.classList.contains('active');
+    r.remove(); renumberRows();
+    if (wasActive) setActiveRow(timeRows()[timeRows().length - 1] || null);
+  });
+  $('#fAddTime').addEventListener('click', () => {
+    const vals = timeRows().map((r) => r.querySelector('input').value).filter(Boolean).map((v) => new Date(v).getTime());
+    const base = vals.length ? Math.max(...vals) + 3 * 3600e3 : Date.now() + 3600e3; // +3 jam dari masa terakhir
+    const r = addTimeRow(base); if (r) { setActiveRow(r); r.querySelector('input').focus(); }
+  });
   $('#presets').addEventListener('click', (e) => {
     const p = e.target.dataset.p; if (!p) return;
     const d = new Date();
@@ -464,33 +558,60 @@
     if (p === 'eve') { d.setHours(17, 0, 0, 0); if (d < new Date()) d.setDate(d.getDate() + 1); }
     if (p === 'night') { d.setHours(21, 0, 0, 0); if (d < new Date()) d.setDate(d.getDate() + 1); }
     if (p === 'tmr') { d.setDate(d.getDate() + 1); d.setHours(9, 0, 0, 0); }
-    $('#fDue').value = p === 'none' ? '' : toLocalInput(d.getTime());
+    if (p === 'none') { $('#fTimes').innerHTML = ''; renumberRows(); return; }
+    let r = $('#fTimes .trow.active') || timeRows()[0] || addTimeRow();
+    r.querySelector('input').value = toLocalInput(d.getTime()); setActiveRow(r);
   });
   $('#sheet').addEventListener('submit', (e) => {
     e.preventDefault();
     const title = $('#fTitle').value.trim(); if (!title) return;
-    const due = $('#fDue').value ? new Date($('#fDue').value).getTime() : null;
-    const data = { title, due, repeat: due ? $('#fRepeat').value : 'none', note: $('#fNote').value.trim() };
-    if (editing) {
-      if (editing.due !== due) editing.notifiedFor = null;
-      Object.assign(editing, data);
-    } else S.tasks.push({ id: uid(), done: false, notifiedFor: null, created: Date.now(), ...data });
+    const times = [...new Set(timeRows().map((r) => r.querySelector('input').value).filter(Boolean)
+      .map((v) => new Date(v).getTime()).filter(Number.isFinite))].sort((a, b) => a - b).slice(0, MAX_TIMES);
+    const data = { title, times, repeat: times.length ? $('#fRepeat').value : 'none', note: $('#fNote').value.trim() };
+    let t = editing;
+    if (t) {
+      const changed = JSON.stringify(t.times) !== JSON.stringify(times);
+      Object.assign(t, data);
+      if (changed) { t.snoozed = {}; t.acked = t.acked.filter((x) => times.includes(x)); pruneNotified(t); }
+    } else { t = migrateTask({ id: uid(), done: false, created: Date.now(), ...data }); S.tasks.push(t); }
     closeSheet(); save(); scheduleTriggers();
-    toast(!due ? tr('saved') : due <= Date.now() ? tr('savedPast') : tr('willRemind')(fmtDue(due)));
+    const next = nextAt(t), more = pending(t).filter((x) => x.at > Date.now()).length - 1;
+    toast(!times.length ? tr('saved') : next === null ? tr('savedPast') : tr('willRemind')(fmtDue(next)) + (more > 0 ? tr('plusMore')(more) : ''));
   });
   $('#fDelete').addEventListener('click', () => {
     if (!editing) return;
     S.tasks = S.tasks.filter((t) => t !== editing); closeSheet(); save(); toast(tr('deleted'));
   });
 
+  // Selesai SELURUH tugasan (checkbox): ulang → anjak semua masa; sekali → done
   function completeTask(t) {
-    if (t.repeat && t.repeat !== 'none' && t.due) {
-      t.due = nextOccurrence(t.due, t.repeat); t.notifiedFor = null;
-      toast(tr('nextAt')(fmtDue(t.due)));
+    if (t.repeat && t.repeat !== 'none' && t.times.length) {
+      advanceTimes(t);
+      toast(tr('nextAt')(fmtDue(nextAt(t))));
     } else { t.done = true; t.doneAt = Date.now(); toast(tr('good')); }
     save();
   }
-  function snooze(t, mins = 10) { t.due = Date.now() + mins * 6e4; t.notifiedFor = null; save(); toast(tr('snoozed')(mins)); }
+  // Slot yang berkaitan dengan notifikasi: ikut masa asal (ts), atau slot lalu terawal yang belum selesai
+  // (notifikasi lama tanpa ts = tugasan satu masa → slot pertama)
+  function findSlot(t, ts) {
+    const p = pending(t);
+    return p.find((x) => x.base === ts) || p.filter((x) => x.at <= Date.now()).sort((a, b) => a.at - b.at)[0] ||
+      (ts === undefined ? p[0] : null);
+  }
+  // Selesai SATU masa (butang notifikasi) / done for ONE time
+  function ackSlot(t, ts) {
+    const x = findSlot(t, ts);
+    if (!x) { if (ts === undefined) completeTask(t); return; }
+    t.acked.push(x.base); delete t.snoozed[x.base];
+    if (!pending(t).length) return completeTask(t);
+    const next = nextAt(t);
+    save(); toast(next ? tr('nextAt')(fmtDue(next)) : tr('good'));
+  }
+  function snooze(t, mins = 10, ts) {
+    const x = findSlot(t, ts); if (!x) return;
+    t.snoozed[x.base] = Date.now() + mins * 6e4; pruneNotified(t);
+    save(); toast(tr('snoozed')(mins));
+  }
 
   $('#tab-tasks').addEventListener('click', (e) => {
     const row = e.target.closest('.row'); if (!row) return;
@@ -535,7 +656,7 @@
     try {
       const d = JSON.parse(await f.text());
       if (!Array.isArray(d.tasks) || !Array.isArray(d.shop)) throw 0;
-      S = Object.assign(defaults(), d); save(); toast(tr('restored'));
+      S = Object.assign(defaults(), d); S.tasks.forEach(migrateTask); save(); toast(tr('restored'));
     } catch { toast(tr('badBackup')); }
   });
 
@@ -556,7 +677,13 @@
   const RR = { daily: 'FREQ=DAILY', weekly: 'FREQ=WEEKLY', monthly: 'FREQ=MONTHLY' };
   function timeToday(hhmm) { const [h, m] = hhmm.split(':').map(Number); const d = new Date(); d.setHours(h, m, 0, 0); if (d < new Date()) d.setDate(d.getDate() + 1); return d.getTime(); }
   function downloadIcs(tasks, name, extra = []) {
-    const evs = tasks.filter((t) => t.due && !t.done).map((t) => vevent({ uidv: t.id, start: t.due, title: '🔔 ' + t.title, desc: t.note, rrule: RR[t.repeat] }));
+    // Satu acara + alarm untuk SETIAP masa / one event + alarm per time
+    const evs = tasks.filter((t) => !t.done && t.times.length).flatMap((t) => {
+      const rep = RR[t.repeat], n = t.times.length;
+      return slots(t)
+        .filter((x) => rep || (!x.acked && x.at > Date.now()))
+        .map((x) => vevent({ uidv: `${t.id}-${x.i}`, start: rep ? x.base : x.at, title: '🔔 ' + t.title + (n > 1 ? ` (${x.i + 1}/${n})` : ''), desc: t.note, rrule: rep }));
+    });
     const all = evs.concat(extra);
     if (!all.length) return toast(tr('noTimed'));
     const ics = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Ingat//MS', 'CALSCALE:GREGORIAN', ...all, 'END:VCALENDAR'].join('\r\n');
@@ -598,19 +725,19 @@
   function check() {
     const now = Date.now(); let changed = false;
     for (const t of S.tasks) {
-      if (!t.done && t.due && t.due <= now && t.notifiedFor !== t.due) {
-        notify('⏰ ' + t.title, t.note || tr('timeToDo'), {
-          tag: 'task-' + t.id, requireInteraction: true, data: { id: t.id },
-          actions: [{ action: 'done', title: tr('aDone') }, { action: 'snooze', title: tr('aSnooze') }]
-        });
-        t.notifiedFor = t.due; changed = true;
+      if (t.done) continue;
+      for (const x of pending(t)) {
+        if (x.at <= now && !t.notified.includes(x.at)) {
+          notify(slotTitle(t, x), t.note || tr('timeToDo'), slotOpts(t, x, { requireInteraction: true }));
+          t.notified.push(x.at); changed = true;
+        }
       }
     }
     const today = dayKey(), hhmm = `${pad(new Date().getHours())}:${pad(new Date().getMinutes())}`;
     const st = S.settings;
     if (st.morningTime && hhmm >= st.morningTime && st.lastMorning !== today) {
       const end = new Date().setHours(23, 59, 59, 999);
-      const list = S.tasks.filter((t) => !t.done && (!t.due || t.due <= end));
+      const list = S.tasks.filter((t) => !t.done && (!t.times.length || pending(t).some((x) => x.at <= end)));
       if (list.length) notify(tr('morningN')(list.length), list.slice(0, 6).map((t) => '• ' + t.title).join('\n'), { tag: 'morning' });
       st.lastMorning = today; changed = true;
     }
@@ -622,19 +749,27 @@
     if (changed) save(); else render();
   }
 
+  const slotTitle = (t, x) => '⏰ ' + t.title + (t.times.length > 1 ? ` (${x.i + 1}/${t.times.length})` : '');
+  const slotOpts = (t, x, extra = {}) => ({
+    tag: `task-${t.id}-${x.base}`, data: { id: t.id, ts: x.base },
+    actions: [{ action: 'done', title: tr('aDone') }, { action: 'snooze', title: tr('aSnooze') }], ...extra
+  });
+
   // Notification Triggers (jika pelayar sokong) — notifikasi berjadual walaupun app ditutup
   async function scheduleTriggers() {
     if (!('showTrigger' in Notification.prototype) || !('TimestampTrigger' in window) || Notification.permission !== 'granted') return;
     const reg = swReg || (await navigator.serviceWorker?.ready); if (!reg) return;
     for (const t of S.tasks) {
-      if (t.done || !t.due || t.due <= Date.now()) continue;
-      try {
-        await reg.showNotification('⏰ ' + t.title, {
-          body: t.note || tr('timeToDo'), tag: 'task-' + t.id, data: { id: t.id }, icon: 'icon-192.png',
-          showTrigger: new TimestampTrigger(t.due), // eslint-disable-line no-undef
-          actions: [{ action: 'done', title: tr('aDone') }, { action: 'snooze', title: tr('aSnooze') }]
-        });
-      } catch {}
+      if (t.done) continue;
+      for (const x of pending(t)) {
+        if (x.at <= Date.now()) continue;
+        try {
+          await reg.showNotification(slotTitle(t, x), slotOpts(t, x, {
+            body: t.note || tr('timeToDo'), icon: 'icon-192.png',
+            showTrigger: new TimestampTrigger(x.at) // eslint-disable-line no-undef
+          }));
+        } catch {}
+      }
     }
   }
 
@@ -648,10 +783,11 @@
     } catch {}
   }
 
-  function handleAction(act, id) {
-    const t = S.tasks.find((x) => x.id === id); if (!t) return;
-    if (act === 'done') completeTask(t);
-    else if (act === 'snooze') { snooze(t, 10); scheduleTriggers(); }
+  function handleAction(act, id, ts) {
+    const t = S.tasks.find((x) => x.id === id); if (!t || t.done) return setTab('tasks');
+    const slot = Number(ts) || undefined;
+    if (act === 'done') ackSlot(t, slot);
+    else if (act === 'snooze') { snooze(t, 10, slot); scheduleTriggers(); }
     else { setTab('tasks'); }
   }
 
@@ -671,10 +807,10 @@
   // ---------- Mula ----------
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('sw.js').then((r) => { swReg = r; registerPeriodic(); scheduleTriggers(); }).catch(() => {});
-    navigator.serviceWorker.addEventListener('message', (e) => e.data && handleAction(e.data.act, e.data.id));
+    navigator.serviceWorker.addEventListener('message', (e) => e.data && handleAction(e.data.act, e.data.id, e.data.ts));
   }
   const q = new URLSearchParams(location.search);
-  if (q.get('act') && q.get('id')) { handleAction(q.get('act'), q.get('id')); history.replaceState(null, '', location.pathname); }
+  if (q.get('act') && q.get('id')) { handleAction(q.get('act'), q.get('id'), q.get('ts')); history.replaceState(null, '', location.pathname); }
 
   $('#langBtn').addEventListener('click', () => { S.settings.lang = S.settings.lang === 'ms' ? 'en' : 'ms'; applyLang(); save(); scheduleTriggers(); });
   applyLang();

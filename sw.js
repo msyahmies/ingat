@@ -1,5 +1,5 @@
 // Service worker: offline + paparan notifikasi + semak peringatan di latar belakang
-const CACHE = 'ingat-v5';
+const CACHE = 'ingat-v6';
 const ASSETS = ['./', './index.html', './manifest.webmanifest', './icon-192.png', './icon-512.png', './minta.html'];
 const DATA_KEY = './__ingat_data__';
 
@@ -31,6 +31,14 @@ self.addEventListener('fetch', (e) => {
 
 // Background check (Chrome Android, bila app dipasang ke skrin utama).
 // Pelayar yang tentukan kekerapan — jangan bergantung 100% pada ini.
+// Setiap tugasan boleh ada sehingga 4 masa: times[] + snoozed{} + acked[] + notified[].
+// Data lama { due, notifiedFor } masih disokong.
+function slotsOf(t) {
+  const times = Array.isArray(t.times) ? t.times : (Number.isFinite(t.due) ? [t.due] : []);
+  const sn = t.snoozed || {}, ack = Array.isArray(t.acked) ? t.acked : [];
+  return times.map((base, i) => ({ base, i, n: times.length, at: Number(sn[base]) || base, acked: ack.includes(base) }));
+}
+
 async function checkDue() {
   const cache = await caches.open('ingat-data');
   const res = await cache.match(DATA_KEY);
@@ -40,20 +48,23 @@ async function checkDue() {
   const now = Date.now();
   let changed = false;
   for (const t of data.tasks || []) {
-    if (!t.done && t.due && t.due <= now && t.notifiedFor !== t.due) {
-      await self.registration.showNotification('⏰ ' + t.title, {
+    if (t.done) continue;
+    if (!Array.isArray(t.notified)) t.notified = Number.isFinite(t.notifiedFor) ? [t.notifiedFor] : [];
+    for (const x of slotsOf(t)) {
+      if (x.acked || x.at > now || t.notified.includes(x.at)) continue;
+      await self.registration.showNotification('⏰ ' + t.title + (x.n > 1 ? ` (${x.i + 1}/${x.n})` : ''), {
         body: t.note || (en ? 'Time to do this!' : 'Masa untuk buat ni!'),
-        tag: 'task-' + t.id,
+        tag: `task-${t.id}-${x.base}`,
         icon: 'icon-192.png',
         badge: 'icon-192.png',
         requireInteraction: true,
-        data: { id: t.id },
+        data: { id: t.id, ts: x.base },
         actions: [
           { action: 'done', title: en ? '✅ Done' : '✅ Selesai' },
           { action: 'snooze', title: en ? '⏳ Snooze 10 min' : '⏳ Tunda 10 min' }
         ]
       });
-      t.notifiedFor = t.due;
+      t.notified.push(x.at);
       changed = true;
     }
   }
@@ -66,13 +77,14 @@ self.addEventListener('periodicsync', (e) => {
 
 self.addEventListener('notificationclick', (e) => {
   e.notification.close();
-  const id = e.notification.data && e.notification.data.id;
+  const d = e.notification.data || {};
+  const id = d.id, ts = d.ts;
   const action = e.action || 'open';
-  const url = './index.html' + (id ? `?act=${action}&id=${encodeURIComponent(id)}` : '');
+  const url = './index.html' + (id ? `?act=${action}&id=${encodeURIComponent(id)}` + (ts ? `&ts=${ts}` : '') : '');
   e.waitUntil(
     self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((list) => {
       for (const c of list) {
-        if (id) c.postMessage({ act: action, id });
+        if (id) c.postMessage({ act: action, id, ts });
         if ('focus' in c) return c.focus();
       }
       return self.clients.openWindow(url);
