@@ -9,6 +9,13 @@
  *                                → { result: 'success', items: [{ id, time, from, item, note }], next }
  *   GET  /                       → { result: 'ok' } (semak worker hidup)
  *
+ * SYNC antara peranti / sync between devices (header X-Sync-Code: kod sync peribadi, 20–64 huruf/nombor):
+ *   GET  /sync                   → { result: 'success', rev, updatedAt, data }   (rev 0 + data null jika belum ada)
+ *   PUT  /sync  { baseRev, data } → { result: 'success', rev, updatedAt }
+ *                                   409 { result: 'conflict', rev, updatedAt, data } jika baseRev ≠ rev semasa
+ *                                   (app gabung data terkini dan cuba semula — tiada data tertindih)
+ *   Data disimpan di KV key  sync:<SHA-256 kod>  — kod mentah TIDAK disimpan. Had saiz 1 MB.
+ *
  * Binding / tetapan (Settings → Variables / Bindings):
  *   LIST              KV namespace (wajib)
  *   ALLOWED_ORIGINS   (pilihan) senarai origin dipisah koma (ganti default).
@@ -24,6 +31,9 @@ const PREFIX = 'item:';
 const TTL_SECONDS = 60 * 60 * 24 * 30; // barang dibuang automatik selepas 30 hari
 const MAX_ITEMS = 50;
 const MAX_LIST = 500; // had barang dipulangkan sekali tarik
+const SYNC_PREFIX = 'sync:';
+const SYNC_MAX_BYTES = 1024 * 1024; // 1 MB
+const SYNC_TTL_SECONDS = 60 * 60 * 24 * 400; // dibuang jika tiada sync selama ~13 bulan
 
 export default {
   async fetch(request, env, ctx) {
@@ -33,6 +43,8 @@ export default {
     try {
       if (!env.LIST) return json({ result: 'error', message: 'KV binding LIST belum diset / not bound' }, 500, cors);
       const url = new URL(request.url);
+
+      if (url.pathname.replace(/\/+$/, '') === '/sync') return await handleSync(request, env, cors);
 
       if (request.method === 'POST') return await handlePost(request, env, ctx, cors);
 
@@ -122,12 +134,60 @@ async function readBody(request) {
   return Object.fromEntries(new URLSearchParams(text));
 }
 
+// ====== SYNC ======
+const normCode = (c) => String(c || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+
+async function sha256hex(text) {
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text));
+  return [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, '0')).join('');
+}
+
+async function handleSync(request, env, cors) {
+  const code = normCode(request.headers.get('X-Sync-Code'));
+  if (code.length < 20 || code.length > 64) {
+    return json({ result: 'error', message: 'Kod sync tak sah / invalid sync code' }, 400, cors);
+  }
+  const key = SYNC_PREFIX + await sha256hex('ingat-sync:' + code); // kod mentah tak disimpan
+  const raw = await env.LIST.get(key);
+  const cur = raw ? JSON.parse(raw) : null;
+  const curRev = (cur && cur.rev) || 0;
+
+  if (request.method === 'GET') {
+    return json({ result: 'success', rev: curRev, updatedAt: (cur && cur.updatedAt) || 0, data: (cur && cur.data) || null }, 200, cors);
+  }
+
+  if (request.method === 'PUT') {
+    const len = Number(request.headers.get('content-length') || 0);
+    if (len > SYNC_MAX_BYTES) return json({ result: 'error', message: 'Data terlalu besar / too large (max 1 MB)' }, 413, cors);
+    const text = await request.text();
+    if (new TextEncoder().encode(text).length > SYNC_MAX_BYTES) {
+      return json({ result: 'error', message: 'Data terlalu besar / too large (max 1 MB)' }, 413, cors);
+    }
+    let body;
+    try { body = JSON.parse(text); } catch { return json({ result: 'error', message: 'JSON tak sah / invalid JSON' }, 400, cors); }
+    const data = body && body.data;
+    if (!data || typeof data !== 'object' || !Array.isArray(data.tasks) || !Array.isArray(data.shop)) {
+      return json({ result: 'error', message: 'Format data tak sah / invalid data (perlu tasks[] & shop[])' }, 400, cors);
+    }
+    const baseRev = Number(body.baseRev) || 0;
+    if (baseRev !== curRev) {
+      // Peranti lain dah simpan dulu → pulangkan data terkini untuk digabung
+      return json({ result: 'conflict', rev: curRev, updatedAt: (cur && cur.updatedAt) || 0, data: (cur && cur.data) || null }, 409, cors);
+    }
+    const next = { rev: curRev + 1, updatedAt: Date.now(), data: { v: 1, tasks: data.tasks, shop: data.shop } };
+    await env.LIST.put(key, JSON.stringify(next), { expirationTtl: SYNC_TTL_SECONDS });
+    return json({ result: 'success', rev: next.rev, updatedAt: next.updatedAt }, 200, cors);
+  }
+
+  return json({ result: 'error', message: 'Method not allowed' }, 405, cors);
+}
+
 function corsHeaders(request, env) {
   const allowed = String(env.ALLOWED_ORIGINS || DEFAULT_ORIGINS).split(',').map((s) => s.trim()).filter(Boolean);
   const origin = request.headers.get('Origin') || '';
   const h = {
-    'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type',
+    'Access-Control-Allow-Methods': 'GET, POST, PUT, OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type, X-Sync-Code',
     'Access-Control-Max-Age': '86400',
     'Vary': 'Origin'
   };

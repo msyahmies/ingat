@@ -19,6 +19,7 @@ App web (PWA) yang dipasang terus ke skrin utama fon. Tak perlu Play Store. Data
   - 🌅 ringkasan pagi: senarai kerja hari ni (default 8:00 pagi)
   - 🛒 peringatan barang yang belum dibeli (default 5:30 petang)
 - **📅 Kalendar**: eksport peringatan ke Kalendar fon (fail `.ics`).
+- **☁️ Sync antara peranti**: tugasan & senarai sama di fon, PC dan app skrin utama, dengan kod sync peribadi. Lihat [Sync antara peranti](#setup-sync).
 
 ## ⚠️ Penting: had notifikasi app web
 
@@ -144,7 +145,61 @@ Paste the URL in **Settings → Receive lists from others** (the app detects the
 ```bash
 npm test
 ```
-Ujian `worker.js` dengan KV & Telegram palsu ([`tests/worker.test.mjs`](tests/worker.test.mjs)). Tiada pakej perlu dipasang (Node 18+).
+Ujian `worker.js` (borang & `/sync`) dengan KV & Telegram palsu, dan ujian logik gabung sync `merge.js`: [`tests/`](tests/). Tiada pakej perlu dipasang (Node 18+).
+
+<a id="setup-sync"></a>
+
+## ☁️ Sync antara peranti (fon, PC, app skrin utama)
+
+Tugasan dan senarai **Nak Beli** jadi sama di semua peranti kau. Setting peranti (bahasa, masa ringkasan pagi / peringatan barang) kekal berasingan dalam setiap peranti. App tetap jalan **tanpa internet**, dan sync berlaku bila online semula.
+
+Sync guna Cloudflare Worker yang sama dengan borang ([`worker.js`](worker.js), KV binding `LIST`). Tiada binding atau setting baru diperlukan.
+
+### Setup sekali sahaja
+
+**1. Deploy semula Worker dengan kod terbaru** (wajib sekali, sebab endpoint `/sync` adalah baru)
+1. Cloudflare dashboard → **Workers & Pages** → Worker `ingat` → **Edit code**.
+2. Padam semua kod, tampal **semua** isi [`worker.js`](worker.js) terbaru → **Deploy**.
+3. Uji: buka `https://ingat.msyahmies.workers.dev/sync` dalam browser. Sepatutnya keluar `{"result":"error","message":"Kod sync tak sah ..."}`. Itu betul, sebab tiada kod dihantar. Kalau keluar `{"result":"ok",...}`, kod lama masih berjalan.
+
+**2. Hidupkan sync di peranti pertama** (cth PC)
+1. App Ingat! → **Tetapan → Sync antara peranti** → **✨ Jana kod sync baru**.
+2. Data dalam peranti ni terus dimuat naik. Status bertukar jadi **✓ Sync terakhir: …**
+
+**3. Sambung peranti lain** (cth fon). Pilih satu cara:
+- **QR:** di PC tekan **▦ Tunjuk QR** → imbas dengan kamera fon → app terbuka dan kod diisi automatik.
+- **Link:** tekan **🔗 Kongsi link** → hantar kepada **diri sendiri** (cth WhatsApp "Message yourself") → buka di fon.
+- **Taip kod:** tekan **Tunjuk** / **📋 Salin kod** → di fon, **Tetapan → Dah ada kod dari peranti lain?** → tampal → **Sambung**.
+
+Data yang **sedia ada** dalam peranti baru akan **digabung**, bukan diganti. Tiada tugasan atau barang yang hilang.
+
+> **App skrin utama (PWA):** di sesetengah fon, app yang dipasang di skrin utama simpan data berasingan dari browser. Kalau macam tu, buka app dari skrin utama → Tetapan → masukkan kod (taip / tampal). Selepas tu ia sync sama macam peranti lain.
+
+### Bila sync berlaku?
+- Bila app dibuka atau kembali ke skrin.
+- ±2 saat selepas setiap perubahan (tambah, edit, tanda, padam).
+- Setiap 1 minit selagi app terbuka.
+- Bila internet kembali (selepas offline).
+- Tekan **🔄 Sync sekarang** bila-bila masa.
+
+Status dalam Tetapan: **✓ Sync terakhir: 7:28 malam**, **📴 Offline**, atau **⚠️ Ralat sync: …**. Ikon ☁️ di header (☁️⚠️ jika ralat).
+
+### Macam mana data tak hilang / tertindih?
+- Setiap tugasan dan barang ada `id` + `updatedAt`. Item yang dipadam disimpan sebagai *tombstone* (`deleted: true`) selama 90 hari.
+- Bila dua peranti sync, data **digabung per item**: versi dengan `updatedAt` terbaru menang. Edit item **berbeza** di dua peranti → kedua-dua kekal. Edit item **sama** → yang terkini menang.
+- Kalau dua peranti simpan serentak, server tolak yang lambat (409) dan peranti tu gabung semula sebelum simpan. Tiada yang tertindih.
+- Notifikasi tetap keluar di **setiap** peranti. Rekod "dah dinotifikasi" disimpan setempat dan tak disync. Tugasan lama yang datang dari peranti lain tak akan bunyi semula.
+- Jam peranti dipakai untuk `updatedAt`, jadi pastikan masa peranti betul (auto).
+
+### Keselamatan kod sync
+- Kod = 24 huruf/nombor rawak (±120 bit). **Macam kata laluan**: sesiapa yang ada kod boleh baca dan ubah senarai kau. Jangan kongsi dengan orang lain.
+- Worker simpan data di KV key `sync:<SHA-256 kod>`. **Kod mentah tak disimpan.**
+- Kod sync **tak** dimasukkan dalam fail backup.
+- Kod bocor? Di setiap peranti: **Tetapan → Lanjutan → Putuskan sync**, kemudian **Jana kod sync baru** di satu peranti dan sambung semula yang lain. Data kekal dalam peranti.
+- Had saiz data sync: 1 MB (beribu-ribu tugasan). Data sync yang tak digunakan selama ±13 bulan dibuang automatik.
+
+### English
+**Sync** keeps your tasks and To Buy list the same on every device (language and notification times stay per-device; the app works offline). One-time setup: **redeploy the Worker** with the latest [`worker.js`](worker.js) (new `/sync` endpoint; no new bindings). Then in the app: **Settings → Sync between devices → Create a new sync code**, and connect other devices via **QR**, **Share link** or by typing the code. Existing data on each device is **merged**, never replaced. Items merge per item by latest `updatedAt`, deletions are tombstones, and concurrent saves are retried after a 409 conflict. The code is a secret (~120 bits). The Worker stores data under `sync:<SHA-256 of code>` and never stores the raw code.
 
 ## Fail
 
@@ -157,7 +212,9 @@ Ujian `worker.js` dengan KV & Telegram palsu ([`tests/worker.test.mjs`](tests/wo
 | `minta.html` | Borang untuk orang lain isi senarai barang |
 | `worker.js` | Cloudflare Worker: simpan senarai dalam KV & bagi app tarik (backend A) |
 | `Code.gs` | Google Apps Script: simpan senarai ke Google Sheet & bagi app tarik (backend B) |
-| `tests/worker.test.mjs`, `package.json` | Ujian untuk `worker.js` (`npm test`) |
+| `merge.js` | Logik gabung data sync (per item, `updatedAt` + tombstone) |
+| `vendor/qrcode.js` | Pustaka QR (MIT, Kazuhiko Arase) untuk kod sync, dimuat bila perlu sahaja |
+| `tests/*.test.mjs`, `package.json` | Ujian `worker.js` (borang + `/sync`) dan `merge.js` (`npm test`) |
 
 ---
 
@@ -167,4 +224,5 @@ Ujian `worker.js` dengan KV & Telegram palsu ([`tests/worker.test.mjs`](tests/wo
 - **To Buy:** shopping list; type several at once with commas: `eggs, sugar, bread`.
 - **Notifications:** at the task time (with **Done / Snooze 10 min** buttons), a morning summary (default 8:00 AM) and an "items not bought yet" reminder (default 5:30 PM).
 - **Limitation:** phones put web apps to sleep when closed, so notifications may be late. For important things, tap 📅 to add them to your phone's Calendar, which always rings.
+- **Sync:** keep tasks & lists the same on all your devices with a private sync code (Settings → Sync between devices). See [setup](#setup-sync).
 - **Install:** open https://ingat-h7u.pages.dev on your phone → Android Chrome: menu ⋮ → *Install app*; iPhone Safari: Share → *Add to Home Screen*. Then tap **Allow notifications** and try **Settings → Send test notification**.

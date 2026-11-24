@@ -1,6 +1,6 @@
 // Service worker: offline + paparan notifikasi + semak peringatan di latar belakang
-const CACHE = 'ingat-v6';
-const ASSETS = ['./', './index.html', './manifest.webmanifest', './icon-192.png', './icon-512.png', './minta.html'];
+const CACHE = 'ingat-v7';
+const ASSETS = ['./', './index.html', './manifest.webmanifest', './icon-192.png', './icon-512.png', './minta.html', './merge.js', './vendor/qrcode.js'];
 const DATA_KEY = './__ingat_data__';
 
 self.addEventListener('install', (e) => {

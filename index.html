@@ -82,6 +82,16 @@
   .addtime{margin-top:8px;color:var(--brand);font-weight:700;border-color:var(--brand);background:var(--card)}
   .fhint{font-size:12px;color:var(--mute);margin:6px 2px 0}
   .meta .past{opacity:.55}
+  .syncrow{display:flex;gap:8px;align-items:center}
+  .synccode{flex:1;min-width:0;font:600 15px ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;background:var(--soft);color:var(--ink);padding:10px 12px;border-radius:10px;word-break:break-all;letter-spacing:.5px}
+  .btn.small{padding:9px 12px;font-size:14px;flex:none}
+  .set p.syncstatus{font-weight:600;color:var(--mute);margin-top:10px}
+  .set p.syncstatus.ok{color:var(--brand)}
+  .set p.syncstatus.err{color:var(--red)}
+  .qrbox{margin-top:12px;text-align:center}
+  .qrbox svg{width:220px;height:220px;max-width:100%;background:#fff;border:1px solid var(--line);border-radius:12px;padding:8px}
+  details.adv{margin-top:14px;border-top:1px solid var(--line);padding-top:10px}
+  details.adv summary{cursor:pointer;color:var(--mute);font-size:14px}
   .hidden{display:none!important}
 </style>
 </head>
@@ -123,6 +133,31 @@
       <label for="shopTime" data-t="shopL">🛒 Ingatkan barang yang belum dibeli</label>
       <input type="time" id="shopTime">
       <p data-t="clearHint">Kosongkan masa untuk matikan.</p>
+    </div>
+
+    <h2 data-t="syncH">Sync antara peranti</h2>
+    <div class="card" id="syncCard">
+      <p style="margin-top:0" data-t="syncP">Tugasan &amp; senarai Nak Beli sama di semua peranti.</p>
+      <div id="syncOff">
+        <div class="actions"><button class="btn" id="syncGen" data-t="syncGen">✨ Jana kod sync baru</button></div>
+        <label for="syncCodeIn" data-t="syncHave">Dah ada kod dari peranti lain?</label>
+        <div class="quick"><input id="syncCodeIn" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="XXXX-XXXX-XXXX-XXXX-XXXX-XXXX"><button class="btn" type="button" id="syncJoin" data-t="syncJoin">Sambung</button></div>
+      </div>
+      <div id="syncOn" class="hidden">
+        <label data-t="syncYourCode" style="margin-top:0">Kod sync kau</label>
+        <div class="syncrow"><code id="syncCodeShow" class="synccode"></code><button type="button" class="btn ghost small" id="syncReveal" data-t="syncShow">Tunjuk</button></div>
+        <p data-t="syncSecret">🔒 Kod ni macam kata laluan.</p>
+        <div class="actions"><button class="btn ghost" id="syncCopy" data-t="syncCopy">📋 Salin kod</button><button class="btn ghost" id="syncShare" data-t="syncShare">🔗 Kongsi link</button></div>
+        <div class="actions"><button class="btn ghost" id="syncQrBtn" data-t="syncQr">▦ Tunjuk QR</button><button class="btn" id="syncNowBtn" data-t="syncNow">🔄 Sync sekarang</button></div>
+        <div id="syncQr" class="qrbox hidden"></div>
+        <p id="syncStatus" class="syncstatus"></p>
+      </div>
+      <details class="adv"><summary data-t="syncAdv">Lanjutan</summary>
+        <label for="syncServer" data-t="syncServerL">URL server sync (Cloudflare Worker)</label>
+        <input id="syncServer" inputmode="url" placeholder="https://ingat.msyahmies.workers.dev">
+        <div class="actions"><button class="btn ghost" id="syncServerSave" data-t="inboxSave">Simpan URL</button></div>
+        <div class="actions hidden" id="syncOffRow"><button class="btn red" id="syncOffBtn" data-t="syncOff">Putuskan sync di peranti ini</button></div>
+      </details>
     </div>
 
     <h2 data-t="inboxH">Terima senarai dari orang lain</h2>
@@ -208,6 +243,7 @@
 
 <div class="toast" id="toast"></div>
 
+<script src="merge.js"></script>
 <script>
 (() => {
   'use strict';
@@ -237,6 +273,13 @@
     return t;
   }
   S.tasks.forEach(migrateTask);
+
+  // ---------- Data sync: updatedAt + tombstone ----------
+  const SYNC_DEFAULT = 'https://ingat.msyahmies.workers.dev';
+  S.deleted = Object.assign({ tasks: [], shop: [] }, S.deleted);
+  S.sync = Object.assign({ code: '', server: SYNC_DEFAULT, rev: 0, lastAt: 0, lastErr: '' }, S.sync);
+  S.tasks.forEach((t) => { if (!t.updatedAt) t.updatedAt = t.created || 1; });
+  S.shop.forEach((i) => { if (!i.updatedAt) i.updatedAt = 1; });
   const slots = (t) => t.times.map((base, i) => ({ base, i, at: Number(t.snoozed[base]) || base, acked: t.acked.includes(base) }));
   const pending = (t) => slots(t).filter((x) => !x.acked);
   const lastAt = (t) => { const p = pending(t); return p.length ? Math.max(...p.map((x) => x.at)) : null; };
@@ -249,6 +292,22 @@
   const L = {
     ms: {
       tabTasks: 'Tugasan', tabShop: 'Nak Beli', tabSet: 'Tetapan',
+      syncH: 'Sync antara peranti',
+      syncP: 'Tugasan &amp; senarai Nak Beli jadi sama di semua peranti (fon, PC, app skrin utama). Bahasa &amp; masa notifikasi kekal berasingan dalam setiap peranti. App tetap jalan tanpa internet. <a href="https://github.com/msyahmies/ingat#setup-sync" target="_blank" rel="noopener">Cara setup</a>',
+      syncGen: '✨ Jana kod sync baru', syncHave: 'Dah ada kod dari peranti lain?', syncJoin: 'Sambung',
+      syncYourCode: 'Kod sync kau', syncShow: 'Tunjuk', syncHide: 'Sorok',
+      syncSecret: '🔒 Kod ni macam kata laluan: sesiapa yang ada kod boleh baca &amp; ubah senarai kau. Kongsi hanya dengan peranti sendiri.',
+      syncCopy: '📋 Salin kod', syncShare: '🔗 Kongsi link', syncQr: '▦ Tunjuk QR', syncQrHide: '▦ Sorok QR', syncNow: '🔄 Sync sekarang',
+      syncAdv: 'Lanjutan', syncServerL: 'URL server sync (Cloudflare Worker)', syncOff: 'Putuskan sync di peranti ini',
+      syncStOk: (d) => `✓ Sync terakhir: ${d}`, syncStBusy: '🔄 Sedang sync…', syncStOffline: '📴 Offline — akan sync bila online semula',
+      syncStErr: (m) => `⚠️ Ralat sync: ${m}`, syncStNever: 'Belum sync lagi', syncNet: 'tak dapat hubungi server',
+      syncBadCode: 'Kod tak sah. Kod mesti sekurang-kurangnya 20 huruf/nombor.',
+      syncJoinConfirm: 'Sambung ke sync dengan kod ini?\n\nData dalam peranti ini akan DIGABUNG dengan data sync (tiada yang dipadam).',
+      syncOffConfirm: 'Putuskan sync di peranti ini?\n\nData dalam peranti ini kekal, tapi tak akan sama lagi dengan peranti lain.',
+      syncCopied: 'Kod disalin', syncLinkCopied: 'Link disalin — buka di peranti lain',
+      syncShareMsg: 'Buka link ni di peranti aku yang lain untuk sync app Ingat! (RAHSIA — jangan kongsi dengan orang lain)',
+      syncOnT: 'Sync dihidupkan ✓ — data sedang digabung', syncOffT: 'Sync diputuskan', syncDoneT: 'Sync selesai ✓',
+      syncQrHint: 'Imbas dengan kamera peranti lain untuk buka app dengan kod ini.', syncQrFail: 'QR gagal dimuat.', syncServerSaved: 'URL server disimpan',
       permText: '<b>Notifikasi belum dibenarkan.</b> Tanpa ni, app tak boleh ingatkan kau.', permBtn: 'Benarkan notifikasi',
       shopPh: 'Tambah barang, cth: telur, gula, roti', add: 'Tambah',
       autoH: 'Peringatan automatik', morningL: '🌅 Ringkasan pagi (senarai kerja hari ni)', shopL: '🛒 Ingatkan barang yang belum dibeli',
@@ -301,6 +360,22 @@
     },
     en: {
       tabTasks: 'Tasks', tabShop: 'To Buy', tabSet: 'Settings',
+      syncH: 'Sync between devices',
+      syncP: 'Your tasks &amp; To Buy list stay the same on every device (phone, PC, home-screen app). Language &amp; notification times stay separate on each device. The app still works offline. <a href="https://github.com/msyahmies/ingat#setup-sync" target="_blank" rel="noopener">Setup guide</a>',
+      syncGen: '✨ Create a new sync code', syncHave: 'Already have a code from another device?', syncJoin: 'Connect',
+      syncYourCode: 'Your sync code', syncShow: 'Show', syncHide: 'Hide',
+      syncSecret: '🔒 This code is like a password: anyone with it can read &amp; change your lists. Only share it with your own devices.',
+      syncCopy: '📋 Copy code', syncShare: '🔗 Share link', syncQr: '▦ Show QR', syncQrHide: '▦ Hide QR', syncNow: '🔄 Sync now',
+      syncAdv: 'Advanced', syncServerL: 'Sync server URL (Cloudflare Worker)', syncOff: 'Disconnect sync on this device',
+      syncStOk: (d) => `✓ Last synced: ${d}`, syncStBusy: '🔄 Syncing…', syncStOffline: '📴 Offline — will sync when back online',
+      syncStErr: (m) => `⚠️ Sync error: ${m}`, syncStNever: 'Not synced yet', syncNet: "can't reach the server",
+      syncBadCode: 'Invalid code. It must be at least 20 letters/numbers.',
+      syncJoinConfirm: 'Connect to sync with this code?\n\nData on this device will be MERGED with the synced data (nothing is deleted).',
+      syncOffConfirm: 'Disconnect sync on this device?\n\nData on this device stays, but will no longer match your other devices.',
+      syncCopied: 'Code copied', syncLinkCopied: 'Link copied — open it on your other device',
+      syncShareMsg: 'Open this link on my other device to sync the Ingat! app (SECRET — do not share with others)',
+      syncOnT: 'Sync on ✓ — merging data', syncOffT: 'Sync disconnected', syncDoneT: 'Sync done ✓',
+      syncQrHint: 'Scan with your other device’s camera to open the app with this code.', syncQrFail: 'Could not load the QR code.', syncServerSaved: 'Server URL saved',
       permText: "<b>Notifications are off.</b> Without them, the app can't remind you.", permBtn: 'Allow notifications',
       shopPh: 'Add items, e.g. eggs, sugar, bread', add: 'Add',
       autoH: 'Automatic reminders', morningL: "🌅 Morning summary (today's tasks)", shopL: "🛒 Remind me of items I haven't bought",
@@ -361,15 +436,49 @@
     $('#langBtn').textContent = S.settings.lang === 'ms' ? 'EN' : 'BM';
     $('#fab').setAttribute('aria-label', tr('newTask'));
     if (document.querySelector('#fTimes .trow')) try { renumberRows(); } catch {}
+    try { renderSync(); } catch {}
     if (typeof renderInbox === 'function') try { renderInbox(); } catch {}
   }
 
   const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
-  function save() {
+  // Setiap perubahan pada tugasan/barang dikesan automatik: updatedAt dikemas kini, item yang hilang jadi tombstone.
+  // (notified[] = rekod notifikasi peranti ini sahaja → tak dikira sebagai perubahan & tak disync)
+  const fp = (o) => JSON.stringify(o, (k, v) => (k === 'updatedAt' || k === 'notified' ? undefined : v));
+  let snap = new Map();
+  function snapshot() {
+    snap = new Map();
+    S.tasks.forEach((t) => snap.set('t:' + t.id, fp(t)));
+    S.shop.forEach((i) => snap.set('s:' + i.id, fp(i)));
+  }
+  function stamp() {
+    const now = Date.now(), seen = new Set();
+    let changed = false;
+    for (const [k0, list] of [['t', S.tasks], ['s', S.shop]]) {
+      for (const it of list) {
+        const k = k0 + ':' + it.id; seen.add(k);
+        if (snap.get(k) !== fp(it)) { it.updatedAt = Math.max(now, (it.updatedAt || 0) + 1); changed = true; }
+      }
+    }
+    for (const k of snap.keys()) {
+      if (seen.has(k)) continue;
+      const id = k.slice(2), arr = k[0] === 't' ? S.deleted.tasks : S.deleted.shop;
+      const i = arr.findIndex((x) => x.id === id); if (i >= 0) arr.splice(i, 1);
+      arr.push({ id, deleted: true, updatedAt: now });
+      changed = true;
+    }
+    snapshot();
+    return changed;
+  }
+  function persist() {
     try { localStorage.setItem(KEY, JSON.stringify(S)); } catch {}
     // salinan untuk service worker (semakan latar belakang)
     if ('caches' in window) caches.open('ingat-data').then((c) => c.put('./__ingat_data__', new Response(JSON.stringify(S)))).catch(() => {});
     render();
+  }
+  function save() {
+    const changed = stamp();
+    persist();
+    if (changed) scheduleSync();
   }
 
   // ---------- Masa ----------
@@ -475,7 +584,7 @@
     $('#cShop').textContent = toBuy.length;
     const d = new Date();
     $('#today').textContent = `${tr('days')[d.getDay()]}, ${d.getDate()} ${tr('months')[d.getMonth()]} ${d.getFullYear()}` +
-      (late.length ? ` · ${tr('nMissed')(late.length)}` : '');
+      (late.length ? ` · ${tr('nMissed')(late.length)}` : '') + (S.sync.code ? (S.sync.lastErr ? ' · ☁️⚠️' : ' · ☁️') : '');
     $('#permBanner').classList.toggle('hidden', !('Notification' in window) || Notification.permission === 'granted');
   }
 
@@ -648,7 +757,8 @@
     S.tasks = S.tasks.filter((t) => !t.done); S.shop = S.shop.filter((i) => !i.bought); save(); toast(tr('cleaned'));
   });
   $('#backupBtn').addEventListener('click', () => {
-    download(new Blob([JSON.stringify(S, null, 2)], { type: 'application/json' }), `ingat-backup-${dayKey()}.json`);
+    const { sync, ...data } = S; // kod sync (rahsia) tak dimasukkan dalam backup
+    download(new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' }), `ingat-backup-${dayKey()}.json`);
   });
   $('#restoreBtn').addEventListener('click', () => $('#restoreFile').click());
   $('#restoreFile').addEventListener('change', async (e) => {
@@ -656,7 +766,12 @@
     try {
       const d = JSON.parse(await f.text());
       if (!Array.isArray(d.tasks) || !Array.isArray(d.shop)) throw 0;
-      S = Object.assign(defaults(), d); S.tasks.forEach(migrateTask); save(); toast(tr('restored'));
+      const keepSync = S.sync, keepDel = S.deleted;
+      S = Object.assign(defaults(), d); S.sync = keepSync; S.deleted = keepDel;
+      S.settings = Object.assign(defaults().settings, S.settings);
+      S.tasks.forEach(migrateTask);
+      snap = new Map(); // semua item backup dikira baru → digabung dengan data sync (tiada tombstone)
+      save(); toast(tr('restored'));
     } catch { toast(tr('badBackup')); }
   });
 
@@ -804,6 +919,165 @@
   $('#installBtn').addEventListener('click', async () => { if (!deferredPrompt) return; deferredPrompt.prompt(); await deferredPrompt.userChoice; deferredPrompt = null; $('#installRow').classList.add('hidden'); });
   if (matchMedia('(display-mode: standalone)').matches) $('#installCard').classList.add('hidden');
 
+  // ---------- SYNC antara peranti ----------
+  var syncBusy = false, syncAgain = false, syncOffline = false, syncTimer = null, syncReveal = false, syncQrOn = false;
+  const normCode = (c) => String(c || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+  const fmtCode = (c) => (c.match(/.{1,4}/g) || []).join('-');
+  function genCode() {
+    const A = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // tanpa I/O/0/1 supaya tak keliru
+    return [...crypto.getRandomValues(new Uint8Array(24))].map((x) => A[x % 32]).join(''); // 24 aksara = 120 bit
+  }
+  const syncBase = () => (S.sync.server || SYNC_DEFAULT).replace(/\/+$/, '');
+  const syncLink = () => location.origin + location.pathname + '#sync=' + fmtCode(S.sync.code) +
+    (syncBase() !== SYNC_DEFAULT ? '&s=' + encodeURIComponent(syncBase()) : '');
+
+  const stripLocal = (t) => { const { notified, ...r } = t; return r; };
+  function payload() {
+    return { v: 1, tasks: S.tasks.map(stripLocal).concat(S.deleted.tasks), shop: S.shop.concat(S.deleted.shop) };
+  }
+  function applyMerged(m) {
+    const prev = new Map(S.tasks.map((t) => [t.id, t]));
+    const now = Date.now();
+    const tomb = (x) => ({ id: String(x.id), deleted: true, updatedAt: x.updatedAt });
+    S.tasks = m.tasks.filter((x) => !x.deleted).map((x) => {
+      const t = migrateTask(JSON.parse(JSON.stringify(x)));
+      const old = prev.get(t.id);
+      // tugasan baru dari peranti lain: masa yang dah lalu tak dinotifikasi lagi di sini
+      t.notified = old ? (old.notified || []).slice() : slots(t).filter((s) => s.at <= now).map((s) => s.at);
+      pruneNotified(t);
+      return t;
+    });
+    S.deleted.tasks = m.tasks.filter((x) => x.deleted).map(tomb);
+    S.shop = m.shop.filter((x) => !x.deleted).map((x) => JSON.parse(JSON.stringify(x)));
+    S.deleted.shop = m.shop.filter((x) => x.deleted).map(tomb);
+    snapshot();
+    persist();
+  }
+  async function syncFetch(method, body) {
+    const ctl = 'AbortController' in window ? new AbortController() : null;
+    const tm = ctl && setTimeout(() => ctl.abort(), 15000);
+    try {
+      const res = await fetch(syncBase() + '/sync', {
+        method, cache: 'no-store', signal: ctl ? ctl.signal : undefined,
+        headers: Object.assign({ 'X-Sync-Code': S.sync.code }, body ? { 'content-type': 'application/json' } : {}),
+        body: body ? JSON.stringify(body) : undefined
+      });
+      let j = {}; try { j = await res.json(); } catch {}
+      if (res.status === 409) return Object.assign({ conflict: true }, j);
+      if (!res.ok || j.result !== 'success') throw new Error(j.message || 'HTTP ' + res.status);
+      return j;
+    } catch (e) {
+      if (e.name === 'TypeError' || e.name === 'AbortError') throw new Error(tr('syncNet'));
+      throw e;
+    } finally { if (tm) clearTimeout(tm); }
+  }
+  // Tarik → gabung → simpan. Kalau peranti lain simpan dulu (409), gabung semula & cuba lagi.
+  async function syncNow(manual) {
+    const sc = S.sync;
+    if (!sc.code || typeof IngatMerge === 'undefined') return;
+    if (!navigator.onLine) { syncOffline = true; renderSync(); return; }
+    if (syncBusy) { syncAgain = true; return; }
+    syncBusy = true; syncOffline = false; renderSync();
+    try {
+      let remote = await syncFetch('GET');
+      for (let i = 0; ; i++) {
+        if (i >= 5) throw new Error('conflict');
+        applyMerged(IngatMerge.mergeState(payload(), remote.data || { tasks: [], shop: [] }));
+        const out = payload();
+        if (remote.data && IngatMerge.sameState(out, remote.data)) { sc.rev = remote.rev; break; }
+        const put = await syncFetch('PUT', { baseRev: remote.rev || 0, data: out });
+        if (put.conflict) { remote = put; continue; }
+        sc.rev = put.rev; break;
+      }
+      sc.lastAt = Date.now(); sc.lastErr = '';
+      if (manual) toast(tr('syncDoneT'));
+    } catch (e) {
+      sc.lastErr = String((e && e.message) || e).slice(0, 120);
+      if (manual) toast(tr('syncStErr')(sc.lastErr));
+    } finally {
+      syncBusy = false; persist(); renderSync();
+      if (syncAgain) { syncAgain = false; scheduleSync(300); }
+    }
+  }
+  function scheduleSync(ms = 2000) {
+    if (!S.sync.code) return;
+    clearTimeout(syncTimer); syncTimer = setTimeout(() => syncNow(), ms);
+  }
+  function renderSync() {
+    const on = !!S.sync.code;
+    $('#syncOff').classList.toggle('hidden', on);
+    $('#syncOn').classList.toggle('hidden', !on);
+    $('#syncOffRow').classList.toggle('hidden', !on);
+    $('#syncServer').value = S.sync.server || SYNC_DEFAULT;
+    if (!on) { syncQrOn = false; $('#syncQr').classList.add('hidden'); $('#syncQr').innerHTML = ''; return; }
+    const full = fmtCode(S.sync.code);
+    $('#syncCodeShow').textContent = syncReveal ? full : full.slice(0, 4) + full.slice(4, -4).replace(/[A-Z0-9]/g, '•') + full.slice(-4);
+    $('#syncReveal').textContent = syncReveal ? tr('syncHide') : tr('syncShow');
+    $('#syncQrBtn').textContent = syncQrOn ? tr('syncQrHide') : tr('syncQr');
+    const st = $('#syncStatus'), sc = S.sync;
+    let cls = '', txt;
+    if (syncBusy) txt = tr('syncStBusy');
+    else if (syncOffline || !navigator.onLine) txt = tr('syncStOffline');
+    else if (sc.lastErr) { txt = tr('syncStErr')(sc.lastErr); cls = 'err'; }
+    else if (sc.lastAt) {
+      const d = new Date(sc.lastAt);
+      txt = tr('syncStOk')(dayKey(d) === dayKey() ? fmtTime(d) : fmtDue(sc.lastAt)); cls = 'ok';
+    } else txt = tr('syncStNever');
+    st.textContent = txt; st.className = 'syncstatus ' + cls;
+  }
+  function joinSync(code, server) {
+    S.sync.code = code; S.sync.rev = 0; S.sync.lastErr = ''; S.sync.lastAt = 0;
+    if (server && validHttps(server)) S.sync.server = server.replace(/\/+$/, '');
+    syncReveal = false; persist(); renderSync(); toast(tr('syncOnT')); syncNow();
+  }
+  const validHttps = (u) => { try { return new URL(u).protocol === 'https:'; } catch { return false; } };
+  $('#syncGen').addEventListener('click', () => joinSync(genCode()));
+  $('#syncJoin').addEventListener('click', () => {
+    const c = normCode($('#syncCodeIn').value);
+    if (c.length < 20 || c.length > 64) return toast(tr('syncBadCode'));
+    if (!confirm(tr('syncJoinConfirm'))) return;
+    $('#syncCodeIn').value = ''; joinSync(c);
+  });
+  $('#syncReveal').addEventListener('click', () => { syncReveal = !syncReveal; renderSync(); });
+  $('#syncCopy').addEventListener('click', async () => {
+    try { await navigator.clipboard.writeText(fmtCode(S.sync.code)); toast(tr('syncCopied')); } catch { prompt(tr('syncYourCode'), fmtCode(S.sync.code)); }
+  });
+  $('#syncShare').addEventListener('click', async () => {
+    const link = syncLink();
+    if (navigator.share) { try { await navigator.share({ title: 'Ingat! sync', text: tr('syncShareMsg'), url: link }); return; } catch (e) { if (e.name === 'AbortError') return; } }
+    try { await navigator.clipboard.writeText(link); toast(tr('syncLinkCopied')); } catch { prompt('Link:', link); }
+  });
+  function loadQrLib() {
+    if (window.qrcode) return Promise.resolve();
+    return new Promise((res, rej) => { const sc = document.createElement('script'); sc.src = 'vendor/qrcode.js'; sc.onload = res; sc.onerror = rej; document.head.appendChild(sc); });
+  }
+  $('#syncQrBtn').addEventListener('click', async () => {
+    const box = $('#syncQr');
+    syncQrOn = !syncQrOn; renderSync();
+    if (!syncQrOn) { box.classList.add('hidden'); box.innerHTML = ''; return; }
+    try {
+      await loadQrLib();
+      const qr = window.qrcode(0, 'M'); qr.addData(syncLink()); qr.make();
+      const n = qr.getModuleCount(); let d = '';
+      for (let r = 0; r < n; r++) for (let c = 0; c < n; c++) if (qr.isDark(r, c)) d += `M${c} ${r}h1v1h-1z`;
+      box.innerHTML = `<svg viewBox="-4 -4 ${n + 8} ${n + 8}" shape-rendering="crispEdges" role="img" aria-label="QR"><rect x="-4" y="-4" width="${n + 8}" height="${n + 8}" fill="#fff"/><path d="${d}" fill="#0f172a"/></svg><p>${tr('syncQrHint')}</p>`;
+    } catch { box.innerHTML = `<p>${tr('syncQrFail')}</p>`; }
+    box.classList.remove('hidden');
+  });
+  $('#syncNowBtn').addEventListener('click', () => syncNow(true));
+  $('#syncOffBtn').addEventListener('click', () => {
+    if (!confirm(tr('syncOffConfirm'))) return;
+    S.sync.code = ''; S.sync.rev = 0; S.sync.lastErr = ''; S.sync.lastAt = 0; syncReveal = false;
+    persist(); renderSync(); toast(tr('syncOffT'));
+  });
+  $('#syncServerSave').addEventListener('click', () => {
+    const u = $('#syncServer').value.trim() || SYNC_DEFAULT;
+    if (!validHttps(u)) return toast(tr('badUrl'));
+    S.sync.server = u.replace(/\/+$/, ''); S.sync.rev = 0; persist(); renderSync(); toast(tr('syncServerSaved')); syncNow();
+  });
+  window.addEventListener('online', () => { syncOffline = false; renderSync(); syncNow(); });
+  window.addEventListener('offline', () => { syncOffline = true; renderSync(); });
+
   // ---------- Mula ----------
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('sw.js').then((r) => { swReg = r; registerPeriodic(); scheduleTriggers(); }).catch(() => {});
@@ -815,10 +1089,25 @@
   $('#langBtn').addEventListener('click', () => { S.settings.lang = S.settings.lang === 'ms' ? 'en' : 'ms'; applyLang(); save(); scheduleTriggers(); });
   applyLang();
   try { setTab(localStorage.getItem('ingat-tab') || 'tasks'); } catch { setTab('tasks'); }
+  snapshot();
   save();
+  renderSync();
+  // Link "buka di peranti lain": #sync=KOD (&s=server) → isi kod automatik
+  // (semasa app dibuka DAN bila link dibuka dalam app yang sedia terbuka — hashchange)
+  function checkSyncHash() {
+    const hp = new URLSearchParams(location.hash.slice(1));
+    if (!hp.get('sync')) return false;
+    const c = normCode(hp.get('sync'));
+    history.replaceState(null, '', location.pathname + location.search);
+    if (c.length >= 20 && c.length <= 64 && c !== S.sync.code && confirm(tr('syncJoinConfirm'))) { setTab('set'); joinSync(c, hp.get('s')); return true; }
+    return false;
+  }
+  window.addEventListener('hashchange', checkSyncHash);
+  if (!checkSyncHash()) syncNow();
+  setInterval(() => { if (!document.hidden) syncNow(); }, 60000);
   check();
   setInterval(check, 15000);
-  document.addEventListener('visibilitychange', () => { if (!document.hidden) { check(); syncInbox(); } });
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) { check(); syncInbox(); syncNow(); } });
 
   // ---------- Peti masuk dari borang ----------
   // Dua jenis backend / two backends:
@@ -840,9 +1129,12 @@
       const j = await res.json();
       if (j.result !== 'success') throw new Error(j.message);
       const seen = new Set(S.inboxSeen || []);
-      const fresh = (j.items || []).filter((x) => x && x.id && !seen.has(x.id));
+      // id tetap 'in-<id>' → peranti lain yang tarik barang sama tak buat salinan (sync gabung ikut id)
+      const known = new Set(S.shop.map((i) => i.id).concat(S.deleted.shop.map((i) => i.id)));
+      const fresh = (j.items || []).filter((x) => x && x.id && !seen.has(x.id) && !known.has('in-' + x.id));
+      (j.items || []).forEach((x) => x && x.id && seen.add(x.id));
       fresh.slice().reverse().forEach((x) => {
-        S.shop.unshift({ id: uid(), name: String(x.item).slice(0, 200), from: String(x.from || '').slice(0, 60), note: String(x.note || '').slice(0, 300), bought: false });
+        S.shop.unshift({ id: 'in-' + x.id, name: String(x.item).slice(0, 200), from: String(x.from || '').slice(0, 60), note: String(x.note || '').slice(0, 300), bought: false });
         seen.add(x.id);
       });
       S.inboxSeen = [...seen].slice(-1000);
